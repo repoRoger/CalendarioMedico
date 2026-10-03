@@ -49,7 +49,7 @@ export default function App() {
   // Modal States (User prefers modals/popups for adding and editing data)
   const [selectedDateForModal, setSelectedDateForModal] = useState<string | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'hospitals' | 'templates' | 'turso'>('hospitals');
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'hospitals' | 'templates'>('hospitals');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -129,7 +129,12 @@ export default function App() {
         if (remoteShifts && remoteShifts.length > 0) {
           setShifts(remoteShifts);
           saveStoredShifts(remoteShifts);
-          addNotification('info', 'Turso sincronizado', `Se cargaron ${remoteShifts.length} turnos de la nube.`);
+        }
+
+        const remoteHospitals = await fetchHospitalsFromTurso(client, cleanEmail);
+        if (remoteHospitals && remoteHospitals.length > 0) {
+          setHospitals(remoteHospitals);
+          saveStoredHospitals(remoteHospitals);
         }
       } catch (err) {
         console.warn('Turso initial fetch error:', err);
@@ -154,12 +159,11 @@ export default function App() {
     saveStoredUser(updatedUser);
     addNotification('success', 'Datos guardados', 'Tu perfil y foto se actualizaron.');
 
-    // Save profile directly to Turso (including photo_blob)
+    // Save profile directly to Turso (including photo_blob) in background
     if (tursoConfig.databaseUrl && tursoConfig.authToken) {
       try {
         const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
         await saveUserProfileToTurso(client, updatedUser);
-        addNotification('info', 'Turso actualizado', 'Perfil y foto guardados en la base de datos.');
       } catch (err) {
         console.warn('Error saving profile to Turso:', err);
       }
@@ -190,8 +194,8 @@ export default function App() {
       addNotification('info', 'Día actualizado', 'Se eliminaron los turnos asignados a esta fecha.');
     }
 
-    // Auto-sync in background to Turso if configured
-    if (tursoConfig.databaseUrl && tursoConfig.authToken) {
+    // Auto-sync in background to Turso
+    if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
       try {
         const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
         syncLocalDataToTurso(client, user.email, nextShifts, hospitals, templates);
@@ -204,11 +208,31 @@ export default function App() {
   const handleSaveHospitals = (updatedHospitals: Hospital[]) => {
     setHospitals(updatedHospitals);
     saveStoredHospitals(updatedHospitals);
+
+    // Auto-sync in background to Turso
+    if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
+      try {
+        const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+        syncLocalDataToTurso(client, user.email, shifts, updatedHospitals, templates);
+      } catch (err) {
+        console.warn('Background Turso sync skipped:', err);
+      }
+    }
   };
 
   const handleSaveTemplates = (updatedTemplates: ShiftTemplate[]) => {
     setTemplates(updatedTemplates);
     saveStoredTemplates(updatedTemplates);
+
+    // Auto-sync in background to Turso
+    if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
+      try {
+        const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+        syncLocalDataToTurso(client, user.email, shifts, hospitals, updatedTemplates);
+      } catch (err) {
+        console.warn('Background Turso sync skipped:', err);
+      }
+    }
   };
 
   const handleSaveTursoConfig = (cfg: TursoConfig) => {
@@ -436,21 +460,16 @@ export default function App() {
         />
       )}
 
-      {/* POPUP: Settings (Hospitales, Horarios, Turso) */}
+      {/* POPUP: Settings (Lugares de Trabajo y Horarios) */}
       {isSettingsModalOpen && (
         <SettingsModal
           isOpen={isSettingsModalOpen}
           initialTab={settingsInitialTab}
           hospitals={hospitals}
           templates={templates}
-          tursoConfig={tursoConfig}
-          shifts={shifts}
-          user={user}
           onClose={() => setIsSettingsModalOpen(false)}
           onSaveHospitals={handleSaveHospitals}
           onSaveTemplates={handleSaveTemplates}
-          onSaveTursoConfig={handleSaveTursoConfig}
-          onImportBackup={handleImportBackup}
           onNotify={addNotification}
         />
       )}

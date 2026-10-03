@@ -1,27 +1,21 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import {
-  X, Settings, Building2, Clock, Database, Cloud, Check,
-  Plus, Edit2, Trash2, RotateCcw, Download, Upload, ShieldCheck, RefreshCw
+  X, Building2, Clock, Trash2, Edit2, Plus, Check,
+  RotateCcw, Sparkles
 } from 'lucide-react';
-import { Hospital, ShiftTemplate, TursoConfig, MedicalShift, UserSession } from '../types';
+import { Hospital, ShiftTemplate } from '../types';
 import { calculateShiftHours } from '../lib/timeUtils';
 import { DEFAULT_TEMPLATES } from '../lib/storage';
-import { getTursoClient, syncLocalDataToTurso, initializeTursoTables } from '../lib/tursoClient';
 
 interface SettingsModalProps {
   isOpen: boolean;
   hospitals: Hospital[];
   templates: ShiftTemplate[];
-  tursoConfig: TursoConfig;
-  shifts: MedicalShift[];
-  user: UserSession;
-  initialTab?: 'hospitals' | 'templates' | 'turso';
+  initialTab?: 'hospitals' | 'templates';
   onClose: () => void;
   onSaveHospitals: (hospitals: Hospital[]) => void;
   onSaveTemplates: (templates: ShiftTemplate[]) => void;
-  onSaveTursoConfig: (config: TursoConfig) => void;
-  onImportBackup: (data: any) => void;
   onNotify: (type: 'success' | 'warning' | 'info', title: string, detail?: string) => void;
 }
 
@@ -38,20 +32,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   hospitals,
   templates,
-  tursoConfig,
-  shifts,
-  user,
   initialTab = 'hospitals',
   onClose,
   onSaveHospitals,
   onSaveTemplates,
-  onSaveTursoConfig,
-  onImportBackup,
   onNotify,
 }) => {
-  const [activeTab, setActiveTab] = useState<'hospitals' | 'templates' | 'turso'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'hospitals' | 'templates'>(initialTab);
 
-  // Hospital state
+  // Hospital / Workplace state
   const [hospList, setHospList] = useState<Hospital[]>(hospitals);
   const [isCreatingHosp, setIsCreatingHosp] = useState(false);
   const [editingHosp, setEditingHosp] = useState<Hospital | null>(null);
@@ -70,12 +59,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Templates state
   const [tplList, setTplList] = useState<ShiftTemplate[]>(templates);
-
-  // Turso state
-  const [dbUrl, setDbUrl] = useState(tursoConfig.databaseUrl);
-  const [authToken, setAuthToken] = useState(tursoConfig.authToken);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatusMsg, setSyncStatusMsg] = useState('');
 
   if (!isOpen) return null;
 
@@ -182,61 +165,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onNotify('success', 'Horarios guardados', 'Plantillas de turnos actualizadas');
   };
 
-  // Turso Handlers
-  const handleSyncTursoNow = async () => {
-    if (!dbUrl || !authToken) {
-      setSyncStatusMsg('Debes ingresar la URL y Token de Turso.');
-      return;
-    }
-
-    setIsSyncing(true);
-    setSyncStatusMsg('Conectando a Turso y creando tablas para ' + user.email + '...');
-
-    try {
-      const client = getTursoClient(dbUrl, authToken);
-      const res = await syncLocalDataToTurso(client, user.email, shifts, hospList, tplList);
-
-      if (res.success) {
-        setSyncStatusMsg(res.message);
-        onSaveTursoConfig({
-          databaseUrl: dbUrl,
-          authToken: authToken,
-          useCloudflareR2: tursoConfig.useCloudflareR2,
-          r2BucketName: tursoConfig.r2BucketName,
-          connected: true,
-        });
-        onNotify('success', 'Sincronizado con Turso', `Datos respaldados para ${user.email}`);
-      } else {
-        setSyncStatusMsg(res.message);
-        onNotify('warning', 'Error en Turso', res.message);
-      }
-    } catch (err: any) {
-      setSyncStatusMsg('Error de conexión: ' + (err.message || 'Desconocido'));
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
       <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 30 }}
-        className="w-full max-w-2xl bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col my-auto"
       >
-        {/* Mobile drag affordance */}
-        <div className="sm:hidden w-12 h-1 bg-slate-700 rounded-full mx-auto mt-2 mb-1" />
-
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/70">
+        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
-              <Settings className="w-4 h-4" />
+              <Building2 className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-100">Ajustes del Sistema</h2>
-              <p className="text-[11px] text-slate-400">Hospitales, horarios sugeridos y base de datos</p>
+              <h2 className="text-base font-bold text-slate-100">Ajustes</h2>
+              <p className="text-xs text-slate-400">Lugares de trabajo y horarios predefinidos</p>
             </div>
           </div>
 
@@ -259,7 +204,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             }`}
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>Hospitales ({hospList.length})</span>
+            <span>Lugares de Trabajo ({hospList.length})</span>
           </button>
 
           <button
@@ -273,103 +218,107 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <Clock className="w-3.5 h-3.5" />
             <span>Horarios Predefinidos</span>
           </button>
-
-          <button
-            onClick={() => setActiveTab('turso')}
-            className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap ${
-              activeTab === 'turso'
-                ? 'bg-teal-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span>Base de Datos Turso</span>
-          </button>
         </div>
 
         {/* Body Content */}
         <div className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-4">
-          {/* TAB 1: HOSPITALS */}
+          {/* TAB 1: HOSPITALS & WORKPLACES */}
           {activeTab === 'hospitals' && (
             <div className="space-y-4">
               {!isCreatingHosp && !editingHosp ? (
                 <>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                      Centros Médicos Activos
+                      Tus Centros y Empresas
                     </span>
                     <button
+                      type="button"
                       onClick={handleStartCreateHosp}
-                      className="min-h-[40px] px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                      className="min-h-[40px] px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>+ Agregar Centro</span>
+                      <span>Nuevo Centro</span>
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {hospList.map((hosp) => (
-                      <div
-                        key={hosp.id}
-                        className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between gap-2.5"
+                  {hospList.length === 0 ? (
+                    <div className="p-6 rounded-2xl bg-slate-950/60 border border-dashed border-slate-800 text-center space-y-2">
+                      <p className="text-xs text-slate-400">Aún no tienes ningún lugar de trabajo creado.</p>
+                      <button
+                        type="button"
+                        onClick={handleStartCreateHosp}
+                        className="px-3.5 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl transition-all"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div
-                            className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0 font-bold shadow-md"
-                            style={{
-                              background: `linear-gradient(135deg, ${hosp.gradientStart}, ${hosp.gradientEnd})`,
-                            }}
-                          >
-                            <Building2 className="w-4 h-4" />
+                        + Crear tu primer centro
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {hospList.map((hosp) => (
+                        <div
+                          key={hosp.id}
+                          className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between gap-2.5"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0 font-bold shadow-md"
+                              style={{
+                                background: `linear-gradient(135deg, ${hosp.gradientStart}, ${hosp.gradientEnd})`,
+                              }}
+                            >
+                              <Building2 className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-xs text-slate-100 truncate">{hosp.name}</p>
+                              <p className="text-[11px] text-slate-400 truncate">
+                                {hosp.city} {hosp.businessType && `· ${hosp.businessType}`} · <span className="font-mono text-teal-400">{hosp.shortName}</span>
+                              </p>
+                            </div>
                           </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-xs text-slate-100 truncate">{hosp.name}</p>
-                            <p className="text-[11px] text-slate-400">{hosp.city} · <span className="font-mono text-teal-400">{hosp.shortName}</span></p>
-                          </div>
-                        </div>
 
-                        {/* Actions with inline delete confirmation */}
-                        {confirmDeleteId === hosp.id ? (
-                          <div className="flex items-center gap-1.5 bg-rose-950/80 border border-rose-500/40 px-2 py-1 rounded-xl animate-in fade-in shrink-0">
-                            <span className="text-[11px] text-rose-300 font-semibold">¿Eliminar?</span>
-                            <button
-                              type="button"
-                              onClick={() => handleConfirmDelete(hosp.id)}
-                              className="w-7 h-7 rounded-lg bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center transition-colors shadow-sm"
-                              title="Sí, eliminar"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors"
-                              title="Cancelar"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              onClick={() => handleStartEditHosp(hosp)}
-                              className="min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-teal-300 p-1 rounded-lg"
-                              title="Editar"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteId(hosp.id)}
-                              className="min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-rose-400 p-1 rounded-lg"
-                              title="Eliminar lugar de trabajo"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                          {/* Actions with inline delete confirmation */}
+                          {confirmDeleteId === hosp.id ? (
+                            <div className="flex items-center gap-1.5 bg-rose-950/80 border border-rose-500/40 px-2 py-1 rounded-xl animate-in fade-in shrink-0">
+                              <span className="text-[11px] text-rose-300 font-semibold">¿Eliminar?</span>
+                              <button
+                                type="button"
+                                onClick={() => handleConfirmDelete(hosp.id)}
+                                className="w-7 h-7 rounded-lg bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center transition-colors shadow-sm"
+                                title="Sí, eliminar"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors"
+                                title="Cancelar"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => handleStartEditHosp(hosp)}
+                                className="min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-teal-300 p-1 rounded-lg"
+                                title="Editar"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteId(hosp.id)}
+                                className="min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-rose-400 p-1 rounded-lg"
+                                title="Eliminar lugar de trabajo"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </>
               ) : (
                 /* Form for Hospital / Workplace */
@@ -533,6 +482,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       onClick={() => {
                         setIsCreatingHosp(false);
                         setEditingHosp(null);
+                        setConfirmDeleteId(null);
                       }}
                       className="px-3 py-2 text-xs text-slate-400 hover:text-slate-200"
                     >
@@ -615,67 +565,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Check className="w-4 h-4" />
                   <span>Guardar Horarios</span>
                 </button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: TURSO DATABASE */}
-          {activeTab === 'turso' && (
-            <div className="space-y-4">
-              <div className="p-3.5 rounded-xl bg-teal-500/10 border border-teal-500/20 text-xs text-teal-200 space-y-1.5">
-                <p className="font-bold text-teal-300 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Multiusuario con `cliente_correo`:</span>
-                </p>
-                <p className="text-[11px] text-teal-200/90 leading-relaxed">
-                  ¡Sí! La base de datos guarda cada turno, hospital y plantilla con la columna <code className="bg-slate-900 px-1 py-0.5 rounded text-teal-300 font-mono">cliente_correo = '{user.email}'</code>. Así puedes usar <strong>una sola base de datos de Turso</strong> para tu amiga, para ti y para cientos de enfermeras con total separación de datos.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                    URL de Base de Datos Turso (libSQL)
-                  </label>
-                  <input
-                    type="text"
-                    value={dbUrl}
-                    onChange={(e) => setDbUrl(e.target.value)}
-                    placeholder="libsql://calendariomedico-rogerappfinanzas.aws-us-east-1.turso.io"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                    Auth Token (Bearer)
-                  </label>
-                  <input
-                    type="password"
-                    value={authToken}
-                    onChange={(e) => setAuthToken(e.target.value)}
-                    placeholder="eyJhbGciOiJFZERTQSIsInR5cCI6..."
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    disabled={isSyncing}
-                    onClick={handleSyncTursoNow}
-                    className="w-full min-h-[44px] py-2.5 px-4 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-teal-900/30 transition-all active:scale-[0.98]"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                    <span>{isSyncing ? 'Sincronizando con Turso...' : `Sincronizar a Turso (${user.email})`}</span>
-                  </button>
-                </div>
-
-                {syncStatusMsg && (
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300">
-                    {syncStatusMsg}
-                  </div>
-                )}
               </div>
             </div>
           )}

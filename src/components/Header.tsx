@@ -17,7 +17,7 @@ interface HeaderProps {
   onNextMonth: () => void;
   onToday: () => void;
   onOpenProfile: () => void;
-  onOpenSettings: (tab?: 'hospitals' | 'templates' | 'turso') => void;
+  onOpenSettings: (tab?: 'hospitals' | 'templates') => void;
   onOpenStats: () => void;
   onOpenExport: () => void;
   onLogout: () => void;
