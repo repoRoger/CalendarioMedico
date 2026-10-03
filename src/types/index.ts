@@ -6,7 +6,7 @@ export interface Hospital {
   color: string; // Base accent color
   gradientStart: string; // e.g. '#0d9488'
   gradientEnd: string;   // e.g. '#059669'
-  badgeIcon: 'hospital' | 'cross' | 'stethoscope' | 'heart' | 'activity' | 'shield';
+  badgeIcon: 'hospital' | 'cross' | 'stethoscope' | 'heart' | 'activity' | 'shield' | 'briefcase' | 'factory' | 'building' | 'star';
   logoUrl?: string; // Optional custom image or data URL
   address?: string;
   isCustom?: boolean;

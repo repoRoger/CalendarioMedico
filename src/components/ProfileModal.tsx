@@ -12,7 +12,7 @@ interface ProfileModalProps {
   onSaveUser: (user: UserSession) => void;
 }
 
-const COMMON_PREFIXES = ['Licda.', 'Lic.', 'Dr.', 'Dra.', 'Téc.', 'Enf.', 'Aux.', 'Mgtr.'];
+const COMMON_PREFIXES = ['Lic.', 'Licda.', 'Ing.', 'Dr.', 'Dra.', 'Téc.', 'Prof.', 'Sr.', 'Sra.', 'Enf.'];
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,
@@ -190,7 +190,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 )}
               </div>
               <p className="text-[10px] text-slate-500">
-                Se guarda en Turso como imagen directa (sin necesidad de buckets externos).
+                Tu foto se guarda y sincroniza en tu cuenta.
               </p>
             </div>
           </div>
@@ -292,12 +292,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <div className="flex items-center gap-2">
               <Mail className="w-4 h-4 text-teal-400" />
               <div>
-                <span className="text-[11px] block text-slate-500">Cuenta de Turso vinculada:</span>
+                <span className="text-[11px] block text-slate-500">Correo vinculado:</span>
                 <span className="font-mono text-slate-200">{currentUser.email}</span>
               </div>
             </div>
-            <span className="text-[10px] text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded font-mono">
-              cliente_correo
+            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-medium">
+              Activo
             </span>
           </div>
 

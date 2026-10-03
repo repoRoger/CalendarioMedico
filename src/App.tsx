@@ -298,64 +298,97 @@ export default function App() {
           </div>
 
           {/* Interactive Pills */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* "Todos los centros" pill */}
-            <button
-              onClick={() => setHospitalFilter('all')}
-              className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 ${
-                hospitalFilter === 'all'
-                  ? 'bg-teal-500 text-slate-950 font-bold shadow-md shadow-teal-500/20 ring-2 ring-teal-400'
-                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700'
-              }`}
-            >
-              <span>Todos los centros</span>
-              <span className="bg-black/20 px-1.5 py-0.2 rounded text-[10.5px] font-mono">
-                {currentMonthShifts.length}
-              </span>
-            </button>
-
-            {/* Each hospital badge */}
-            {hospitals.map((hosp) => {
-              const isSelected = hospitalFilter === hosp.id;
-              const hospHours = currentMonthShifts
-                .filter((s) => s.hospitalId === hosp.id)
-                .reduce((acc, s) => acc + (s.hours || 0), 0);
-
-              return (
+          {hospitals.length === 0 ? (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl bg-slate-950/60 border border-dashed border-slate-800">
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <Sparkles className="w-4 h-4 text-teal-400 shrink-0" />
+                <span>Comienza agregando tu primer lugar de trabajo o centro (hospital, fábrica, empresa, etc.):</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <button
-                  key={hosp.id}
-                  onClick={() => setHospitalFilter(isSelected ? 'all' : hosp.id)}
-                  className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold text-white flex items-center gap-2 transition-all active:scale-95 shadow-sm border ${
-                    isSelected
-                      ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105 border-white'
-                      : 'border-transparent opacity-85 hover:opacity-100 hover:scale-[1.02]'
-                  }`}
-                  style={{
-                    background: `linear-gradient(135deg, ${hosp.gradientStart}, ${hosp.gradientEnd})`,
+                  onClick={() => {
+                    setSettingsInitialTab('hospitals');
+                    setIsSettingsModalOpen(true);
                   }}
-                  title={isSelected ? 'Clic para mostrar todos' : `Filtrar solo turnos de ${hosp.name}`}
+                  className="px-3.5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-900/30 flex items-center gap-1.5"
                 >
-                  <Building2 className="w-3.5 h-3.5" />
-                  <span className="font-bold">{hosp.shortName}</span>
-                  <span className="bg-black/25 px-1.5 py-0.2 rounded text-[10.5px] font-mono">
-                    {hospHours}h
-                  </span>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Agregar centro</span>
                 </button>
-              );
-            })}
+                <button
+                  onClick={() => {
+                    import('./lib/storage').then((m) => {
+                      setHospitals(m.DEFAULT_HOSPITALS);
+                      m.saveStoredHospitals(m.DEFAULT_HOSPITALS);
+                      addNotification('info', 'Ejemplos listos', 'Se agregaron Hospital Bendaña y Catarino');
+                    });
+                  }}
+                  className="px-2.5 py-2 text-slate-400 hover:text-slate-200 text-xs rounded-xl hover:bg-slate-800 transition-colors"
+                >
+                  Cargar ejemplos
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* "Todos los centros" pill */}
+              <button
+                onClick={() => setHospitalFilter('all')}
+                className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 ${
+                  hospitalFilter === 'all'
+                    ? 'bg-teal-500 text-slate-950 font-bold shadow-md shadow-teal-500/20 ring-2 ring-teal-400'
+                    : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700'
+                }`}
+              >
+                <span>Todos los centros</span>
+                <span className="bg-black/20 px-1.5 py-0.2 rounded text-[10.5px] font-mono">
+                  {currentMonthShifts.length}
+                </span>
+              </button>
 
-            {/* Quick link to manage hospitals */}
-            <button
-              onClick={() => {
-                setSettingsInitialTab('hospitals');
-                setIsSettingsModalOpen(true);
-              }}
-              className="text-xs text-slate-400 hover:text-teal-300 px-2.5 py-1.5 rounded-xl border border-dashed border-slate-700 hover:border-teal-500/50 min-h-[40px] flex items-center gap-1 transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Nuevo Centro</span>
-            </button>
-          </div>
+              {/* Each hospital badge */}
+              {hospitals.map((hosp) => {
+                const isSelected = hospitalFilter === hosp.id;
+                const hospHours = currentMonthShifts
+                  .filter((s) => s.hospitalId === hosp.id)
+                  .reduce((acc, s) => acc + (s.hours || 0), 0);
+
+                return (
+                  <button
+                    key={hosp.id}
+                    onClick={() => setHospitalFilter(isSelected ? 'all' : hosp.id)}
+                    className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold text-white flex items-center gap-2 transition-all active:scale-95 shadow-sm border ${
+                      isSelected
+                        ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105 border-white'
+                        : 'border-transparent opacity-85 hover:opacity-100 hover:scale-[1.02]'
+                    }`}
+                    style={{
+                      background: `linear-gradient(135deg, ${hosp.gradientStart}, ${hosp.gradientEnd})`,
+                    }}
+                    title={isSelected ? 'Clic para mostrar todos' : `Filtrar solo turnos de ${hosp.name}`}
+                  >
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span className="font-bold">{hosp.shortName}</span>
+                    <span className="bg-black/25 px-1.5 py-0.2 rounded text-[10.5px] font-mono">
+                      {hospHours}h
+                    </span>
+                  </button>
+                );
+              })}
+
+              {/* Quick link to manage hospitals */}
+              <button
+                onClick={() => {
+                  setSettingsInitialTab('hospitals');
+                  setIsSettingsModalOpen(true);
+                }}
+                className="text-xs text-slate-400 hover:text-teal-300 px-2.5 py-1.5 rounded-xl border border-dashed border-slate-700 hover:border-teal-500/50 min-h-[40px] flex items-center gap-1 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Nuevo Centro</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* View Component based on switcher */}

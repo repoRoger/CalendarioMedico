@@ -393,6 +393,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
                   <div>
+                    <label className="block text-[11px] text-slate-400 mb-1.5">Ícono del Centro / Empresa</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {[
+                        { id: 'hospital', label: 'Hospital' },
+                        { id: 'briefcase', label: 'Empresa / Negocio' },
+                        { id: 'factory', label: 'Fábrica / Planta' },
+                        { id: 'building', label: 'Edificio' },
+                        { id: 'shield', label: 'Seguridad' },
+                        { id: 'cross', label: 'Emergencias' },
+                        { id: 'heart', label: 'Salud' },
+                        { id: 'activity', label: 'Operaciones' },
+                        { id: 'star', label: 'Destacado' },
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setFormBadgeIcon(item.id as any)}
+                          className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                            formBadgeIcon === item.id
+                              ? 'bg-teal-500/20 border-teal-500 text-teal-300'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
                     <label className="block text-[11px] text-slate-400 mb-1.5">Color & Gradiente</label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2">
                       {PRESET_GRADIENTS.map((p) => (

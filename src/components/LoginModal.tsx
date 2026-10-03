@@ -23,7 +23,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   if (!isOpen) return null;
 
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+  const googleClientId =
+    import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+    '1095378668318-ndplgnk6regr0di59c11195stto8bims.apps.googleusercontent.com';
 
   // Handle successful Google OAuth Sign-In response
   const handleGoogleSuccess = (credentialResponse: any) => {

@@ -129,22 +129,21 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
 ];
 
 export const DEFAULT_USER: UserSession = {
-  id: 'usr-karen-sps',
-  titlePrefix: 'Licda.',
-  personalName: 'Karen Rodríguez',
-  name: 'Licda. Karen Rodríguez',
-  email: 'rogradan@gmail.com',
-  role: 'Licenciada en Enfermería',
-  specialty: 'Cuidados Intensivos y Urgencias',
+  id: '',
+  titlePrefix: 'Lic.',
+  personalName: '',
+  name: '',
+  email: '',
+  role: '',
+  specialty: '',
   phone: '',
   photoBlob: '',
   isGoogleAuth: true,
-  isLoggedIn: true,
-  defaultHospitalId: 'hosp-bendana',
+  isLoggedIn: false,
 };
 
-// Generates sample shifts for current month showcasing multi-shifts and 24h shifts!
-function generateSampleShifts(): MedicalShift[] {
+// Generates sample shifts (available on demand)
+export function generateSampleShifts(): MedicalShift[] {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -230,12 +229,11 @@ export function getStoredHospitals(): Hospital[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.HOSPITALS);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.HOSPITALS, JSON.stringify(DEFAULT_HOSPITALS));
-      return DEFAULT_HOSPITALS;
+      return [];
     }
     return JSON.parse(raw);
   } catch {
-    return DEFAULT_HOSPITALS;
+    return [];
   }
 }
 
@@ -251,9 +249,7 @@ export function getStoredShifts(): MedicalShift[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SHIFTS);
     if (!raw) {
-      const initial = generateSampleShifts();
-      localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(initial));
-      return initial;
+      return [];
     }
     return JSON.parse(raw);
   } catch {

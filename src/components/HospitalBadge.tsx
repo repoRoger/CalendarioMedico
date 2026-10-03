@@ -1,6 +1,9 @@
 import React from 'react';
 import { Hospital } from '../types';
-import { Building2, Stethoscope, Heart, Activity, Shield, PlusSquare } from 'lucide-react';
+import {
+  Building2, Stethoscope, Heart, Activity, Shield, PlusSquare,
+  Briefcase, Factory, Building, Star
+} from 'lucide-react';
 
 interface HospitalBadgeProps {
   hospital?: Hospital;
@@ -19,7 +22,7 @@ export const HospitalBadge: React.FC<HospitalBadgeProps> = ({
     return (
       <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
         <Building2 className="w-3.5 h-3.5" />
-        {showName && <span>Sin hospital</span>}
+        {showName && <span>Sin centro</span>}
       </span>
     );
   }
@@ -49,6 +52,14 @@ export const HospitalBadge: React.FC<HospitalBadgeProps> = ({
         return <Activity className={iconClasses} />;
       case 'shield':
         return <Shield className={iconClasses} />;
+      case 'briefcase':
+        return <Briefcase className={iconClasses} />;
+      case 'factory':
+        return <Factory className={iconClasses} />;
+      case 'building':
+        return <Building className={iconClasses} />;
+      case 'star':
+        return <Star className={iconClasses} />;
       case 'hospital':
       default:
         return <Building2 className={iconClasses} />;
