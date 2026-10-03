@@ -1,0 +1,605 @@
+import React, { useState } from 'react';
+import { motion } from 'motion/react';
+import {
+  X, Settings, Building2, Clock, Database, Cloud, Check,
+  Plus, Edit2, Trash2, RotateCcw, Download, Upload, ShieldCheck, RefreshCw
+} from 'lucide-react';
+import { Hospital, ShiftTemplate, TursoConfig, MedicalShift, UserSession } from '../types';
+import { calculateShiftHours } from '../lib/timeUtils';
+import { DEFAULT_TEMPLATES } from '../lib/storage';
+import { getTursoClient, syncLocalDataToTurso, initializeTursoTables } from '../lib/tursoClient';
+
+interface SettingsModalProps {
+  isOpen: boolean;
+  hospitals: Hospital[];
+  templates: ShiftTemplate[];
+  tursoConfig: TursoConfig;
+  shifts: MedicalShift[];
+  user: UserSession;
+  initialTab?: 'hospitals' | 'templates' | 'turso';
+  onClose: () => void;
+  onSaveHospitals: (hospitals: Hospital[]) => void;
+  onSaveTemplates: (templates: ShiftTemplate[]) => void;
+  onSaveTursoConfig: (config: TursoConfig) => void;
+  onImportBackup: (data: any) => void;
+  onNotify: (type: 'success' | 'warning' | 'info', title: string, detail?: string) => void;
+}
+
+const PRESET_GRADIENTS = [
+  { name: 'Esmeralda Quirúrgico', start: '#0d9488', end: '#059669' },
+  { name: 'Azul Clínico', start: '#4f46e5', end: '#0284c7' },
+  { name: 'Carmesí Urgencias', start: '#e11d48', end: '#ea580c' },
+  { name: 'Violeta Especialidades', start: '#7c3aed', end: '#a855f7' },
+  { name: 'Ámbar Pediatría', start: '#d97706', end: '#f59e0b' },
+  { name: 'Cian Cuidados Críticos', start: '#0891b2', end: '#06b6d4' },
+];
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  hospitals,
+  templates,
+  tursoConfig,
+  shifts,
+  user,
+  initialTab = 'hospitals',
+  onClose,
+  onSaveHospitals,
+  onSaveTemplates,
+  onSaveTursoConfig,
+  onImportBackup,
+  onNotify,
+}) => {
+  const [activeTab, setActiveTab] = useState<'hospitals' | 'templates' | 'turso'>(initialTab);
+
+  // Hospital state
+  const [hospList, setHospList] = useState<Hospital[]>(hospitals);
+  const [isCreatingHosp, setIsCreatingHosp] = useState(false);
+  const [editingHosp, setEditingHosp] = useState<Hospital | null>(null);
+
+  const [formName, setFormName] = useState('');
+  const [formShortName, setFormShortName] = useState('');
+  const [formCity, setFormCity] = useState('San Pedro Sula');
+  const [formGradientStart, setFormGradientStart] = useState('#0d9488');
+  const [formGradientEnd, setFormGradientEnd] = useState('#059669');
+  const [formBadgeIcon, setFormBadgeIcon] = useState<Hospital['badgeIcon']>('hospital');
+  const [formLogoUrl, setFormLogoUrl] = useState('');
+
+  // Templates state
+  const [tplList, setTplList] = useState<ShiftTemplate[]>(templates);
+
+  // Turso state
+  const [dbUrl, setDbUrl] = useState(tursoConfig.databaseUrl);
+  const [authToken, setAuthToken] = useState(tursoConfig.authToken);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState('');
+
+  if (!isOpen) return null;
+
+  // Hospital Handlers
+  const handleStartCreateHosp = () => {
+    setIsCreatingHosp(true);
+    setEditingHosp(null);
+    setFormName('');
+    setFormShortName('');
+    setFormCity('San Pedro Sula');
+    setFormGradientStart('#0d9488');
+    setFormGradientEnd('#059669');
+    setFormBadgeIcon('hospital');
+    setFormLogoUrl('');
+  };
+
+  const handleStartEditHosp = (h: Hospital) => {
+    setEditingHosp(h);
+    setIsCreatingHosp(false);
+    setFormName(h.name);
+    setFormShortName(h.shortName);
+    setFormCity(h.city);
+    setFormGradientStart(h.gradientStart);
+    setFormGradientEnd(h.gradientEnd);
+    setFormBadgeIcon(h.badgeIcon);
+    setFormLogoUrl(h.logoUrl || '');
+  };
+
+  const handleSaveHospForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formName.trim()) return;
+
+    const short = formShortName.trim() || formName.trim().slice(0, 10);
+
+    let updated: Hospital[];
+    if (isCreatingHosp) {
+      const newHosp: Hospital = {
+        id: `hosp-${Date.now()}`,
+        name: formName.trim(),
+        shortName: short,
+        city: formCity.trim(),
+        color: formGradientStart,
+        gradientStart: formGradientStart,
+        gradientEnd: formGradientEnd,
+        badgeIcon: formBadgeIcon,
+        logoUrl: formLogoUrl || undefined,
+        isCustom: true,
+      };
+      updated = [...hospList, newHosp];
+    } else {
+      updated = hospList.map((h) =>
+        h.id === editingHosp?.id
+          ? {
+              ...h,
+              name: formName.trim(),
+              shortName: short,
+              city: formCity.trim(),
+              color: formGradientStart,
+              gradientStart: formGradientStart,
+              gradientEnd: formGradientEnd,
+              badgeIcon: formBadgeIcon,
+              logoUrl: formLogoUrl || undefined,
+            }
+          : h
+      );
+    }
+
+    setHospList(updated);
+    onSaveHospitals(updated);
+    setIsCreatingHosp(false);
+    setEditingHosp(null);
+    onNotify('success', 'Hospital guardado', `Se actualizó ${short}`);
+  };
+
+  const handleDeleteHosp = (id: string) => {
+    if (hospList.length <= 1) {
+      alert('Debes mantener al menos un hospital en el sistema.');
+      return;
+    }
+    const updated = hospList.filter((h) => h.id !== id);
+    setHospList(updated);
+    onSaveHospitals(updated);
+    onNotify('info', 'Hospital eliminado');
+  };
+
+  // Templates Handlers
+  const handleUpdateTemplate = (index: number, updates: Partial<ShiftTemplate>) => {
+    setTplList((prev) => {
+      const copy = [...prev];
+      const target = { ...copy[index], ...updates };
+      if (updates.defaultStartTime !== undefined || updates.defaultEndTime !== undefined) {
+        target.defaultHours = calculateShiftHours(target.defaultStartTime, target.defaultEndTime);
+      }
+      copy[index] = target;
+      return copy;
+    });
+  };
+
+  const handleSaveTemplatesAll = () => {
+    onSaveTemplates(tplList);
+    onNotify('success', 'Horarios guardados', 'Plantillas de turnos actualizadas');
+  };
+
+  // Turso Handlers
+  const handleSyncTursoNow = async () => {
+    if (!dbUrl || !authToken) {
+      setSyncStatusMsg('Debes ingresar la URL y Token de Turso.');
+      return;
+    }
+
+    setIsSyncing(true);
+    setSyncStatusMsg('Conectando a Turso y creando tablas para ' + user.email + '...');
+
+    try {
+      const client = getTursoClient(dbUrl, authToken);
+      const res = await syncLocalDataToTurso(client, user.email, shifts, hospList, tplList);
+
+      if (res.success) {
+        setSyncStatusMsg(res.message);
+        onSaveTursoConfig({
+          databaseUrl: dbUrl,
+          authToken: authToken,
+          useCloudflareR2: tursoConfig.useCloudflareR2,
+          r2BucketName: tursoConfig.r2BucketName,
+          connected: true,
+        });
+        onNotify('success', 'Sincronizado con Turso', `Datos respaldados para ${user.email}`);
+      } else {
+        setSyncStatusMsg(res.message);
+        onNotify('warning', 'Error en Turso', res.message);
+      }
+    } catch (err: any) {
+      setSyncStatusMsg('Error de conexión: ' + (err.message || 'Desconocido'));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 30 }}
+        className="w-full max-w-2xl bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+      >
+        {/* Mobile drag affordance */}
+        <div className="sm:hidden w-12 h-1 bg-slate-700 rounded-full mx-auto mt-2 mb-1" />
+
+        {/* Header */}
+        <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/70">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
+              <Settings className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-100">Ajustes del Sistema</h2>
+              <p className="text-[11px] text-slate-400">Hospitales, horarios sugeridos y base de datos</p>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Segmented Tabs (Thumb-Friendly on mobile) */}
+        <div className="px-4 py-2 border-b border-slate-800 bg-slate-950/50 flex gap-1.5 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('hospitals')}
+            className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+              activeTab === 'hospitals'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Hospitales ({hospList.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('templates')}
+            className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+              activeTab === 'templates'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>Horarios Predefinidos</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('turso')}
+            className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+              activeTab === 'turso'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>Base de Datos Turso</span>
+          </button>
+        </div>
+
+        {/* Body Content */}
+        <div className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-4">
+          {/* TAB 1: HOSPITALS */}
+          {activeTab === 'hospitals' && (
+            <div className="space-y-4">
+              {!isCreatingHosp && !editingHosp ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                      Centros Médicos Activos
+                    </span>
+                    <button
+                      onClick={handleStartCreateHosp}
+                      className="min-h-[40px] px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Agregar Centro</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {hospList.map((hosp) => (
+                      <div
+                        key={hosp.id}
+                        className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between gap-2.5"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0 font-bold shadow-md"
+                            style={{
+                              background: `linear-gradient(135deg, ${hosp.gradientStart}, ${hosp.gradientEnd})`,
+                            }}
+                          >
+                            <Building2 className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-xs text-slate-100 truncate">{hosp.name}</p>
+                            <p className="text-[11px] text-slate-400">{hosp.city} · <span className="font-mono text-teal-400">{hosp.shortName}</span></p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleStartEditHosp(hosp)}
+                            className="min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-teal-300 p-1 rounded-lg"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteHosp(hosp.id)}
+                            className="min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-rose-400 p-1 rounded-lg"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                /* Form for Hospital */
+                <form onSubmit={handleSaveHospForm} className="space-y-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <span className="text-xs font-bold text-slate-200">
+                      {isCreatingHosp ? 'Nuevo Hospital o Clínica' : `Editar ${editingHosp?.name}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingHosp(false);
+                        setEditingHosp(null);
+                      }}
+                      className="text-xs text-slate-400 hover:text-slate-200"
+                    >
+                      Volver
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Nombre Completo</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Hospital Bendaña"
+                      value={formName}
+                      onChange={(e) => setFormName(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">Nombre Corto</label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Bendaña"
+                        value={formShortName}
+                        onChange={(e) => setFormShortName(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">Ciudad</label>
+                      <input
+                        type="text"
+                        value={formCity}
+                        onChange={(e) => setFormCity(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1.5">Color & Gradiente</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2">
+                      {PRESET_GRADIENTS.map((p) => (
+                        <button
+                          key={p.name}
+                          type="button"
+                          onClick={() => {
+                            setFormGradientStart(p.start);
+                            setFormGradientEnd(p.end);
+                          }}
+                          className="p-1.5 rounded-lg border border-slate-800 bg-slate-900 flex items-center gap-2 text-left"
+                        >
+                          <div
+                            className="w-4 h-4 rounded shrink-0"
+                            style={{ background: `linear-gradient(135deg, ${p.start}, ${p.end})` }}
+                          />
+                          <span className="text-[10px] text-slate-300 truncate">{p.name}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-400">Color 1:</span>
+                        <input
+                          type="color"
+                          value={formGradientStart}
+                          onChange={(e) => setFormGradientStart(e.target.value)}
+                          className="w-7 h-7 rounded border border-slate-700 bg-transparent cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-400">Color 2:</span>
+                        <input
+                          type="color"
+                          value={formGradientEnd}
+                          onChange={(e) => setFormGradientEnd(e.target.value)}
+                          className="w-7 h-7 rounded border border-slate-700 bg-transparent cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingHosp(false);
+                        setEditingHosp(null);
+                      }}
+                      className="px-3 py-2 text-xs text-slate-400 hover:text-slate-200"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-semibold"
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: TEMPLATES */}
+          {activeTab === 'templates' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pb-1">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Horarios Predeterminados
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTplList(DEFAULT_TEMPLATES)}
+                  className="text-[11px] text-slate-400 hover:text-teal-400 flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Restaurar</span>
+                </button>
+              </div>
+
+              {tplList.map((tpl, idx) => (
+                <div
+                  key={tpl.id}
+                  className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-7 h-7 rounded-lg bg-slate-800 font-mono font-bold text-teal-400 text-xs flex items-center justify-center">
+                      {tpl.code}
+                    </span>
+                    <div>
+                      <p className="font-semibold text-xs text-slate-200">{tpl.name}</p>
+                      <p className="text-[10px] text-slate-500">{tpl.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <div className="flex items-center gap-1 bg-slate-900 px-2 py-1 rounded-lg border border-slate-800 text-[11px] font-mono">
+                      <input
+                        type="time"
+                        value={tpl.defaultStartTime}
+                        onChange={(e) => handleUpdateTemplate(idx, { defaultStartTime: e.target.value })}
+                        className="bg-transparent text-slate-200 focus:outline-none"
+                      />
+                      <span className="text-slate-500">-</span>
+                      <input
+                        type="time"
+                        value={tpl.defaultEndTime}
+                        onChange={(e) => handleUpdateTemplate(idx, { defaultEndTime: e.target.value })}
+                        className="bg-transparent text-slate-200 focus:outline-none"
+                      />
+                    </div>
+
+                    <span className="text-[11px] font-mono font-bold text-teal-400 bg-teal-950/60 px-2 py-1 rounded border border-teal-800/40">
+                      {tpl.defaultHours}h
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleSaveTemplatesAll}
+                  className="min-h-[44px] px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Guardar Horarios</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: TURSO DATABASE */}
+          {activeTab === 'turso' && (
+            <div className="space-y-4">
+              <div className="p-3.5 rounded-xl bg-teal-500/10 border border-teal-500/20 text-xs text-teal-200 space-y-1.5">
+                <p className="font-bold text-teal-300 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Multiusuario con `cliente_correo`:</span>
+                </p>
+                <p className="text-[11px] text-teal-200/90 leading-relaxed">
+                  ¡Sí! La base de datos guarda cada turno, hospital y plantilla con la columna <code className="bg-slate-900 px-1 py-0.5 rounded text-teal-300 font-mono">cliente_correo = '{user.email}'</code>. Así puedes usar <strong>una sola base de datos de Turso</strong> para tu amiga, para ti y para cientos de enfermeras con total separación de datos.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                    URL de Base de Datos Turso (libSQL)
+                  </label>
+                  <input
+                    type="text"
+                    value={dbUrl}
+                    onChange={(e) => setDbUrl(e.target.value)}
+                    placeholder="libsql://calendariomedico-rogerappfinanzas.aws-us-east-1.turso.io"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                    Auth Token (Bearer)
+                  </label>
+                  <input
+                    type="password"
+                    value={authToken}
+                    onChange={(e) => setAuthToken(e.target.value)}
+                    placeholder="eyJhbGciOiJFZERTQSIsInR5cCI6..."
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    disabled={isSyncing}
+                    onClick={handleSyncTursoNow}
+                    className="w-full min-h-[44px] py-2.5 px-4 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-teal-900/30 transition-all active:scale-[0.98]"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                    <span>{isSyncing ? 'Sincronizando con Turso...' : `Sincronizar a Turso (${user.email})`}</span>
+                  </button>
+                </div>
+
+                {syncStatusMsg && (
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300">
+                    {syncStatusMsg}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-800 bg-slate-900/90 flex justify-end">
+          <button
+            onClick={onClose}
+            className="min-h-[44px] px-5 py-2 text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
+          >
+            Cerrar
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
