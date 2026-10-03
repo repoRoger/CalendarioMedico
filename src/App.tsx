@@ -304,30 +304,16 @@ export default function App() {
                 <Sparkles className="w-4 h-4 text-teal-400 shrink-0" />
                 <span>Comienza agregando tu primer lugar de trabajo o centro (hospital, fábrica, empresa, etc.):</span>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setSettingsInitialTab('hospitals');
-                    setIsSettingsModalOpen(true);
-                  }}
-                  className="px-3.5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-900/30 flex items-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Agregar centro</span>
-                </button>
-                <button
-                  onClick={() => {
-                    import('./lib/storage').then((m) => {
-                      setHospitals(m.DEFAULT_HOSPITALS);
-                      m.saveStoredHospitals(m.DEFAULT_HOSPITALS);
-                      addNotification('info', 'Ejemplos listos', 'Se agregaron Hospital Bendaña y Catarino');
-                    });
-                  }}
-                  className="px-2.5 py-2 text-slate-400 hover:text-slate-200 text-xs rounded-xl hover:bg-slate-800 transition-colors"
-                >
-                  Cargar ejemplos
-                </button>
-              </div>
+              <button
+                onClick={() => {
+                  setSettingsInitialTab('hospitals');
+                  setIsSettingsModalOpen(true);
+                }}
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-900/30 flex items-center gap-1.5 shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Agregar centro</span>
+              </button>
             </div>
           ) : (
             <div className="flex items-center gap-2 flex-wrap">

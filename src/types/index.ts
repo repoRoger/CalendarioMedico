@@ -8,6 +8,7 @@ export interface Hospital {
   gradientEnd: string;   // e.g. '#059669'
   badgeIcon: 'hospital' | 'cross' | 'stethoscope' | 'heart' | 'activity' | 'shield' | 'briefcase' | 'factory' | 'building' | 'star';
   logoUrl?: string; // Optional custom image or data URL
+  businessType?: string; // Custom type e.g. 'Hospital', 'Fábrica', 'Call Center', 'Seguridad'
   address?: string;
   isCustom?: boolean;
 }

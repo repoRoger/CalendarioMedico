@@ -68,6 +68,7 @@ export async function initializeTursoTables(client: Client): Promise<void> {
       cliente_correo TEXT NOT NULL,
       nombre TEXT NOT NULL,
       nombre_corto TEXT NOT NULL,
+      tipo_negocio TEXT,
       ciudad TEXT NOT NULL,
       color TEXT,
       gradiente_inicio TEXT,
@@ -161,6 +162,7 @@ export async function fetchHospitalsFromTurso(
     id: String(row.id),
     name: String(row.nombre),
     shortName: String(row.nombre_corto),
+    businessType: row.tipo_negocio ? String(row.tipo_negocio) : undefined,
     city: String(row.ciudad),
     color: String(row.color || '#0d9488'),
     gradientStart: String(row.gradiente_inicio || '#0d9488'),
@@ -189,11 +191,12 @@ export async function syncLocalDataToTurso(
     for (const h of hospitals) {
       await client.execute({
         sql: `
-          INSERT INTO hospitales (id, cliente_correo, nombre, nombre_corto, ciudad, color, gradiente_inicio, gradiente_fin, icono_badge, logo_url)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO hospitales (id, cliente_correo, nombre, nombre_corto, tipo_negocio, ciudad, color, gradiente_inicio, gradiente_fin, icono_badge, logo_url)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             nombre = excluded.nombre,
             nombre_corto = excluded.nombre_corto,
+            tipo_negocio = excluded.tipo_negocio,
             ciudad = excluded.ciudad,
             color = excluded.color,
             gradiente_inicio = excluded.gradiente_inicio,
@@ -206,6 +209,7 @@ export async function syncLocalDataToTurso(
           email,
           h.name,
           h.shortName,
+          h.businessType || null,
           h.city,
           h.color,
           h.gradientStart,

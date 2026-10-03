@@ -35,19 +35,25 @@ export const HospitalManagerModal: React.FC<HospitalManagerModalProps> = ({
   // Form states
   const [formName, setFormName] = useState('');
   const [formShortName, setFormShortName] = useState('');
+  const [formBusinessType, setFormBusinessType] = useState('Hospital');
   const [formCity, setFormCity] = useState('San Pedro Sula');
   const [formGradientStart, setFormGradientStart] = useState('#0d9488');
   const [formGradientEnd, setFormGradientEnd] = useState('#059669');
   const [formBadgeIcon, setFormBadgeIcon] = useState<Hospital['badgeIcon']>('hospital');
   const [formLogoUrl, setFormLogoUrl] = useState('');
 
+  // Inline delete confirmation state
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
   const handleStartCreate = () => {
     setIsCreating(true);
     setEditingHospital(null);
+    setConfirmDeleteId(null);
     setFormName('');
     setFormShortName('');
+    setFormBusinessType('Hospital');
     setFormCity('San Pedro Sula');
     setFormGradientStart('#0d9488');
     setFormGradientEnd('#059669');
@@ -58,8 +64,10 @@ export const HospitalManagerModal: React.FC<HospitalManagerModalProps> = ({
   const handleStartEdit = (hosp: Hospital) => {
     setEditingHospital(hosp);
     setIsCreating(false);
+    setConfirmDeleteId(null);
     setFormName(hosp.name);
     setFormShortName(hosp.shortName);
+    setFormBusinessType(hosp.businessType || 'Hospital');
     setFormCity(hosp.city);
     setFormGradientStart(hosp.gradientStart);
     setFormGradientEnd(hosp.gradientEnd);
@@ -91,6 +99,7 @@ export const HospitalManagerModal: React.FC<HospitalManagerModalProps> = ({
         id: `hosp-${Date.now()}`,
         name: formName.trim(),
         shortName: short,
+        businessType: formBusinessType.trim() || undefined,
         city: formCity.trim(),
         color: formGradientStart,
         gradientStart: formGradientStart,
@@ -109,6 +118,7 @@ export const HospitalManagerModal: React.FC<HospitalManagerModalProps> = ({
               ...h,
               name: formName.trim(),
               shortName: short,
+              businessType: formBusinessType.trim() || undefined,
               city: formCity.trim(),
               color: formGradientStart,
               gradientStart: formGradientStart,
@@ -127,13 +137,10 @@ export const HospitalManagerModal: React.FC<HospitalManagerModalProps> = ({
   };
 
   const handleDelete = (id: string) => {
-    if (list.length <= 1) {
-      alert('Debes mantener al menos un hospital registrado.');
-      return;
-    }
     const updated = list.filter((h) => h.id !== id);
     setList(updated);
     onSaveHospitals(updated);
+    setConfirmDeleteId(null);
     if (editingHospital?.id === id) {
       setEditingHospital(null);
     }
@@ -236,22 +243,45 @@ export const HospitalManagerModal: React.FC<HospitalManagerModalProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleStartEdit(hosp)}
-                        className="p-1.5 text-slate-400 hover:text-teal-300 hover:bg-slate-800 rounded-lg transition-colors"
-                        title="Editar hospital"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(hosp.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {/* Actions with inline delete confirmation */}
+                    {confirmDeleteId === hosp.id ? (
+                      <div className="flex items-center gap-1.5 bg-rose-950/80 border border-rose-500/40 px-2 py-1 rounded-xl animate-in fade-in shrink-0">
+                        <span className="text-[11px] text-rose-300 font-semibold">¿Eliminar?</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(hosp.id)}
+                          className="w-7 h-7 rounded-lg bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center transition-colors shadow-sm"
+                          title="Confirmar eliminación"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors"
+                          title="Cancelar"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => handleStartEdit(hosp)}
+                          className="p-1.5 text-slate-400 hover:text-teal-300 hover:bg-slate-800 rounded-lg transition-colors"
+                          title="Editar lugar de trabajo"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(hosp.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -263,13 +293,14 @@ export const HospitalManagerModal: React.FC<HospitalManagerModalProps> = ({
             <form onSubmit={handleSaveForm} className="space-y-4 bg-slate-950/80 p-4 rounded-xl border border-slate-800">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 className="text-sm font-bold text-slate-200">
-                  {isCreating ? 'Nuevo Hospital o Clínica' : `Editar ${editingHospital?.name}`}
+                  {isCreating ? 'Nuevo Lugar de Trabajo / Centro' : `Editar ${editingHospital?.name}`}
                 </h3>
                 <button
                   type="button"
                   onClick={() => {
                     setIsCreating(false);
                     setEditingHospital(null);
+                    setConfirmDeleteId(null);
                   }}
                   className="text-xs text-slate-400 hover:text-slate-200"
                 >
@@ -296,28 +327,58 @@ export const HospitalManagerModal: React.FC<HospitalManagerModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Nombre Completo del Hospital *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Hospital Bendaña"
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Nombre Completo del Centro o Empresa *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Hospital Bendaña, Planta Cervecería, Empresa Seguridad..."
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
+                />
+              </div>
 
+              {/* Custom Business / Sector Type Text Input */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Tipo o Giro de Negocio (Texto libre)
+                </label>
+                <div className="flex gap-1.5 overflow-x-auto pb-1.5 mb-1.5 scrollbar-none">
+                  {['Hospital', 'Clínica', 'Fábrica / Planta', 'Call Center', 'Seguridad Privada', 'Hotel', 'Comercio'].map((tipo) => (
+                    <button
+                      key={tipo}
+                      type="button"
+                      onClick={() => setFormBusinessType(tipo)}
+                      className={`text-[10px] px-2 py-0.5 rounded-lg border transition-colors shrink-0 ${
+                        formBusinessType === tipo
+                          ? 'bg-teal-500/20 text-teal-300 border-teal-500/40 font-semibold'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                      }`}
+                    >
+                      {tipo}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Escribe el tipo de negocio o actividad..."
+                  value={formBusinessType}
+                  onChange={(e) => setFormBusinessType(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">
                     Nombre Corto (para botones y tarjetas)
                   </label>
                   <input
                     type="text"
-                    placeholder="Ej. Bendaña o Catarino"
+                    placeholder="Ej. Bendaña o Planta 1"
                     value={formShortName}
                     onChange={(e) => setFormShortName(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
