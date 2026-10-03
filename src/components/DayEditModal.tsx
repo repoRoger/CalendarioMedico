@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import {
   X, Plus, Trash2, Clock, Building2, AlertCircle, Check,
-  Calendar, ShieldAlert, Moon, Sparkles, PlusCircle, MinusCircle
+  Calendar, ShieldAlert, Moon, Sparkles, PlusCircle, MinusCircle,
+  UserCheck, FileText
 } from 'lucide-react';
 import { Hospital, MedicalShift, ShiftCode, ShiftTemplate } from '../types';
 import { calculateShiftHours, formatFriendlyDate } from '../lib/timeUtils';
@@ -46,23 +47,24 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
 
   const handleAddShift = (templateCode: ShiftCode = 'M', preferredHospitalId?: string) => {
     const tpl = templates.find((t) => t.code === templateCode) || templates[0];
-    const startTime = tpl?.defaultStartTime || '07:00';
-    const endTime = tpl?.defaultEndTime || '15:00';
+    const isCubrir = templateCode === 'C';
+    const startTime = tpl?.defaultStartTime || (isCubrir ? '07:00' : '07:00');
+    const endTime = tpl?.defaultEndTime || (isCubrir ? '15:00' : '15:00');
     const calculated = calculateShiftHours(startTime, endTime);
 
     const newShift: MedicalShift = {
       id: `shift-${date}-${Date.now()}-${shifts.length + 1}`,
       date,
       hospitalId: preferredHospitalId || defaultHospitalId,
-      shiftCode: tpl?.code || 'M',
-      title: tpl?.name || 'Turno',
+      shiftCode: isCubrir ? 'C' : (tpl?.code || 'M'),
+      title: isCubrir ? 'Cubrir' : (tpl?.name || 'Turno'),
       startTime,
       endTime,
       hours: calculated,
       department: '',
-      notes: '',
+      notes: isCubrir ? 'Cubriendo a ' : '',
       isNightShift: tpl?.isNightShift || false,
-      isSubstitute: false,
+      isSubstitute: isCubrir,
     };
 
     setShifts((prev) => [...prev, newShift]);
@@ -239,6 +241,17 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                 >
                   <span className="font-bold text-rose-300">Guardia 24H</span>
                   <span className="text-[11px] text-amber-300 font-mono">24h</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleAddShift('C')}
+                  className="min-h-[48px] p-2.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 text-slate-100 text-xs font-semibold flex items-center justify-between border border-amber-500/40 transition-all active:scale-95 col-span-2"
+                >
+                  <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5" /> Cubrir a alguien (Cambio)
+                  </span>
+                  <span className="text-[11px] text-amber-400 font-mono">07:00-15:00</span>
                 </button>
               </div>
 
@@ -417,22 +430,58 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Sala/Servicio y Notas */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {/* Área/Puesto y Notas con Chips */}
+                  <div className="space-y-2 pt-1">
                     <input
                       type="text"
-                      placeholder="Servicio (UCI, Emergencias, Piso 3...)"
+                      placeholder="Área, puesto o sala (ej. Emergencias, Piso 4, Línea 2, Caja 1...)"
                       value={shift.department || ''}
                       onChange={(e) => handleUpdateShift(idx, { department: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-teal-500"
                     />
-                    <input
-                      type="text"
-                      placeholder="Observaciones o relevo..."
-                      value={shift.notes || ''}
-                      onChange={(e) => handleUpdateShift(idx, { notes: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-teal-500"
-                    />
+
+                    {/* Nota del turno con chips de acceso rápido */}
+                    <div className="space-y-1.5 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80">
+                      <div className="flex items-center justify-between gap-1 flex-wrap">
+                        <label className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
+                          <FileText className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Nota del turno:</span>
+                        </label>
+                        <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+                          {['Cubriendo a...', 'Cambio de turno', 'Turno extra', 'Relevo'].map((tag) => (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => {
+                                const current = shift.notes || '';
+                                const addition = tag.endsWith('...') ? 'Cubriendo a ' : tag;
+                                handleUpdateShift(idx, {
+                                  notes: current ? `${current} · ${addition}` : addition,
+                                  isSubstitute: tag.includes('Cubriendo') || tag.includes('Cambio') ? true : shift.isSubstitute,
+                                });
+                              }}
+                              className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-300/90 hover:text-amber-200 transition-colors shrink-0"
+                            >
+                              {tag}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Ej. Cubriendo a Carmen, Cambio con David, Relevo 30min antes..."
+                        value={shift.notes || ''}
+                        onChange={(e) =>
+                          handleUpdateShift(idx, {
+                            notes: e.target.value,
+                            isSubstitute:
+                              e.target.value.toLowerCase().includes('cubr') ||
+                              e.target.value.toLowerCase().includes('cambio'),
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-400/70"
+                      />
+                    </div>
                   </div>
                 </div>
               );

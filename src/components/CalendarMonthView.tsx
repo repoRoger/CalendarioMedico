@@ -131,7 +131,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                       style={{
                         background: `linear-gradient(135deg, ${gradStart}, ${gradEnd})`,
                       }}
-                      title={`${shift.title} en ${hosp?.name || 'Hospital'} (${shift.startTime} - ${shift.endTime}) · ${shift.hours}h`}
+                      title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${shift.hours}h${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                     >
                       <div className="flex items-center gap-1 min-w-0">
                         <span className="font-bold font-mono text-[10px] bg-black/25 px-1 rounded shrink-0">
@@ -142,9 +142,19 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                         </span>
                       </div>
 
-                      <span className="font-mono text-[9.5px] opacity-90 shrink-0 ml-1">
-                        {shift.startTime.slice(0, 5)}
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0 ml-1">
+                        {shift.notes && (
+                          <span
+                            className="text-[9px] bg-amber-400/30 text-amber-200 px-0.5 rounded leading-none"
+                            title={`Nota: ${shift.notes}`}
+                          >
+                            📝
+                          </span>
+                        )}
+                        <span className="font-mono text-[9.5px] opacity-90">
+                          {shift.startTime.slice(0, 5)}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}

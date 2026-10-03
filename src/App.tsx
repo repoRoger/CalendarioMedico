@@ -20,6 +20,7 @@ import { MobileBottomBar } from './components/MobileBottomBar';
 import { CalendarMonthView } from './components/CalendarMonthView';
 import { CalendarWeekView } from './components/CalendarWeekView';
 import { ShiftListView } from './components/ShiftListView';
+import { UpcomingShiftsWidget } from './components/UpcomingShiftsWidget';
 import { DayEditModal } from './components/DayEditModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ProfileModal } from './components/ProfileModal';
@@ -400,6 +401,13 @@ export default function App() {
             </div>
           )}
         </div>
+
+        {/* Upcoming Shifts: Hoy y Mañana (Vista rápida al entrar) */}
+        <UpcomingShiftsWidget
+          shifts={shifts}
+          hospitals={hospitals}
+          onSelectDate={(dateIso) => setSelectedDateForModal(dateIso)}
+        />
 
         {/* View Component based on switcher */}
         {currentView === 'month' && (
