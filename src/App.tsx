@@ -37,7 +37,7 @@ import { LedNotification, LedMessage } from './components/LedNotification';
 import {
   getTursoClient, syncLocalDataToTurso, saveUserProfileToTurso,
   fetchUserProfileFromTurso, fetchShiftsFromTurso, fetchHospitalsFromTurso,
-  mergeShifts, mergeHospitals
+  mergeShifts, mergeHospitals, deleteHospitalFromTurso
 } from './lib/tursoClient';
 import { generateSampleShifts } from './lib/storage';
 
@@ -107,24 +107,48 @@ export default function App() {
       const remoteShifts = await fetchShiftsFromTurso(client, user.email);
       const remoteHospitals = await fetchHospitalsFromTurso(client, user.email);
 
-      // 2. TRUE BIDIRECTIONAL MERGE: Combine local + remote
-      const combinedShifts = mergeShifts(shifts, remoteShifts);
-      const combinedHospitals = mergeHospitals(hospitals, remoteHospitals);
+      let finalShifts = remoteShifts || [];
 
-      setShifts(combinedShifts);
-      saveStoredShifts(combinedShifts);
+      // Check if this device has NEW local shifts that aren't in Turso yet (e.g. friend created them offline)
+      if (shifts && shifts.length > 0) {
+        const unsyncedLocal = shifts.filter(
+          (localS) =>
+            !finalShifts.some(
+              (r) => r.id === localS.id || (r.date === localS.date && r.startTime === localS.startTime)
+            )
+        );
+        if (unsyncedLocal.length > 0) {
+          finalShifts = [...finalShifts, ...unsyncedLocal];
+        }
+      }
 
-      setHospitals(combinedHospitals);
-      saveStoredHospitals(combinedHospitals);
+      setShifts(finalShifts);
+      saveStoredShifts(finalShifts);
 
-      // 3. Upload combined set to Turso so Turso has everything from both devices
-      await syncLocalDataToTurso(client, user.email, combinedShifts, combinedHospitals, templates);
+      // 2. HOSPITALS: Turso is authoritative if remote has records.
+      // If this device created a new workplace locally not yet in Turso, include it!
+      let finalHospitals = (remoteHospitals && remoteHospitals.length > 0) ? remoteHospitals : hospitals;
+      if (hospitals && hospitals.length > 0 && remoteHospitals && remoteHospitals.length > 0) {
+        const unsyncedHosp = hospitals.filter(
+          (locH) => !remoteHospitals.some((r) => r.id === locH.id || r.name.toLowerCase() === locH.name.toLowerCase())
+        );
+        const customUnsynced = unsyncedHosp.filter((h) => h.isCustom);
+        if (customUnsynced.length > 0) {
+          finalHospitals = [...finalHospitals, ...customUnsynced];
+        }
+      }
+
+      setHospitals(finalHospitals);
+      saveStoredHospitals(finalHospitals);
+
+      // 3. Keep Turso 100% updated with this consolidated authoritative dataset
+      await syncLocalDataToTurso(client, user.email, finalShifts, finalHospitals, templates);
 
       if (!isSilent) {
         addNotification(
           'success',
           'Nube Turso sincronizada',
-          `Sincronizados ${combinedShifts.length} turnos totales.`
+          `Sincronizados ${finalShifts.length} turnos totales desde Turso.`
         );
       }
 
@@ -274,16 +298,33 @@ export default function App() {
         }
 
         const remoteShifts = await fetchShiftsFromTurso(client, cleanEmail);
-        if (remoteShifts && remoteShifts.length > 0) {
-          setShifts(remoteShifts);
-          saveStoredShifts(remoteShifts);
-        }
-
         const remoteHospitals = await fetchHospitalsFromTurso(client, cleanEmail);
-        if (remoteHospitals && remoteHospitals.length > 0) {
-          setHospitals(remoteHospitals);
-          saveStoredHospitals(remoteHospitals);
+
+        let finalShifts = remoteShifts || [];
+        if (shifts && shifts.length > 0) {
+          const unsyncedLocal = shifts.filter(
+            (localS) =>
+              !finalShifts.some(
+                (r) => r.id === localS.id || (r.date === localS.date && r.startTime === localS.startTime)
+              )
+          );
+          if (unsyncedLocal.length > 0) {
+            finalShifts = [...finalShifts, ...unsyncedLocal];
+            await syncLocalDataToTurso(
+              client,
+              cleanEmail,
+              finalShifts,
+              remoteHospitals && remoteHospitals.length > 0 ? remoteHospitals : hospitals,
+              templates
+            );
+          }
         }
+        setShifts(finalShifts);
+        saveStoredShifts(finalShifts);
+
+        const finalHospitals = (remoteHospitals && remoteHospitals.length > 0) ? remoteHospitals : hospitals;
+        setHospitals(finalHospitals);
+        saveStoredHospitals(finalHospitals);
       } catch (err) {
         console.warn('Turso initial fetch error:', err);
       }
@@ -317,6 +358,61 @@ export default function App() {
       }
     }
   };
+
+  // Quick account switch between Roger and Sofia instantly
+  const handleSwitchAccount = async (targetEmail: string) => {
+    setIsSyncingCloud(true);
+    try {
+      const cleanEmail = targetEmail.trim().toLowerCase();
+      const isTargetSofia = cleanEmail.includes('sofia');
+      const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+
+      const remoteProfile = await fetchUserProfileFromTurso(client, cleanEmail);
+      const remoteShifts = await fetchShiftsFromTurso(client, cleanEmail);
+      const remoteHospitals = await fetchHospitalsFromTurso(client, cleanEmail);
+
+      const switchedUser: UserSession = {
+        id: `usr-${Date.now()}`,
+        email: cleanEmail,
+        titlePrefix: remoteProfile?.titlePrefix || (isTargetSofia ? 'Téc.' : 'Lic.'),
+        personalName: remoteProfile?.personalName || (isTargetSofia ? 'Sofía Hernández' : 'Roger Adan'),
+        name: remoteProfile?.name || (isTargetSofia ? 'Téc. Sofía Hernández' : 'Lic. Roger Adan'),
+        role: remoteProfile?.role || (isTargetSofia ? 'Técnico Instrumentista Quirúrgico' : 'Licenciado en Enfermería'),
+        specialty: remoteProfile?.specialty || (isTargetSofia ? 'Sala de Operaciones' : 'Urgencias y Cuidados Críticos'),
+        phone: remoteProfile?.phone || (isTargetSofia ? '95103405' : ''),
+        photoBlob: remoteProfile?.photoBlob || (isTargetSofia ? 'https://lh3.googleusercontent.com/a/ACg8ocLVZm5ifvnrt8XYv1B2o5tsKXPy2G5a3GkrP8ZOtmFpwNHXBqF9=s96-c' : ''),
+        isLoggedIn: true,
+        isGoogleAuth: true,
+      };
+
+      setUser(switchedUser);
+      saveStoredUser(switchedUser);
+
+      const finalShifts = remoteShifts || [];
+      setShifts(finalShifts);
+      saveStoredShifts(finalShifts);
+
+      const finalHospitals = remoteHospitals || [];
+      setHospitals(finalHospitals);
+      saveStoredHospitals(finalHospitals);
+
+      addNotification('success', `Cuenta activa: ${switchedUser.name}`, `Se mostraron ${finalShifts.length} turnos desde Turso.`);
+    } catch (err: any) {
+      addNotification('warning', 'Error al cambiar cuenta', err.message);
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
+
+  // Default to Sofia's account so Roger can inspect it immediately in the preview
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('user') === 'roger') {
+      handleSwitchAccount('rogradan@gmail.com');
+    } else {
+      handleSwitchAccount('sofiahernandez02311@gmail.com');
+    }
+  }, []);
 
   // Handlers for data updates
   const handleSaveDayShifts = (date: string, updatedDayShifts: MedicalShift[]) => {
@@ -363,7 +459,7 @@ export default function App() {
     }
   };
 
-  const handleSaveHospitals = (updatedHospitals: Hospital[]) => {
+  const handleSaveHospitals = (updatedHospitals: Hospital[], deletedHospId?: string) => {
     setHospitals(updatedHospitals);
     saveStoredHospitals(updatedHospitals);
 
@@ -371,6 +467,9 @@ export default function App() {
     if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
       try {
         const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+        if (deletedHospId) {
+          deleteHospitalFromTurso(client, user.email, deletedHospId).catch(console.warn);
+        }
         syncLocalDataToTurso(client, user.email, shifts, updatedHospitals, templates)
           .then((res) => {
             if (res.success) {
@@ -448,7 +547,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans pb-16 md:pb-6">
-      {/* Top Bar: Shows user title & name (Lic. Roger Adan) and cloud sync button */}
+      {/* Top Bar: Shows user title & name and quick account switch */}
       <Header
         user={user}
         onOpenProfile={() => setIsProfileModalOpen(true)}
@@ -457,10 +556,39 @@ export default function App() {
         onOpenStats={() => setIsStatsModalOpen(true)}
         onOpenExport={() => setIsExportModalOpen(true)}
         onLogout={handleLogout}
+        onSwitchAccount={handleSwitchAccount}
       />
 
       {/* Main Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 pb-24">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 pb-24 space-y-4">
+        {/* Quick User Account Banner */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-md text-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-slate-400">Cuenta activa en Turso:</span>
+            <strong className="text-slate-100 font-bold flex items-center gap-1.5 flex-wrap">
+              <span>{user.name}</span>
+              <span className="text-[10px] text-teal-400 bg-teal-950/60 border border-teal-800/40 px-2 py-0.5 rounded-md font-mono">
+                {shifts.length} turnos
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                ({user.email})
+              </span>
+            </strong>
+          </div>
+
+          <button
+            onClick={() => handleSwitchAccount(user.email.includes('sofia') ? 'rogradan@gmail.com' : 'sofiahernandez02311@gmail.com')}
+            disabled={isSyncingCloud}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border active:scale-95 shadow-sm ${
+              user.email.includes('sofia')
+                ? 'bg-teal-950/70 border-teal-500/50 text-teal-300 hover:bg-teal-900/80 shadow-teal-950/40'
+                : 'bg-purple-950/70 border-purple-500/50 text-purple-300 hover:bg-purple-900/80 shadow-purple-950/40'
+            }`}
+          >
+            <span>⇄ {user.email.includes('sofia') ? 'Ver cuenta de Roger' : 'Ver cuenta de Sofía'}</span>
+          </button>
+        </div>
         {/* VIEW 1: PRÓXIMOS (Página principal por defecto al entrar) */}
         {activeSection === 'proximos' && (
           <ProximosView
@@ -488,7 +616,7 @@ export default function App() {
             }}
             onDeleteHospital={(hospId) => {
               const updated = hospitals.filter((h) => h.id !== hospId);
-              handleSaveHospitals(updated);
+              handleSaveHospitals(updated, hospId);
               addNotification('info', 'Lugar eliminado', 'Se quitó el centro de trabajo.');
             }}
           />

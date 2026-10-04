@@ -128,19 +128,35 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
   },
 ];
 
-export const DEFAULT_USER: UserSession = {
-  id: '',
+export const SOFIA_USER: UserSession = {
+  id: 'usr-sofia',
+  titlePrefix: 'Téc.',
+  personalName: 'Sofía Hernández',
+  name: 'Téc. Sofía Hernández',
+  email: 'sofiahernandez02311@gmail.com',
+  role: 'Técnico Instrumentista Quirúrgico',
+  specialty: 'Sala de Operaciones',
+  phone: '95103405',
+  photoBlob: 'https://lh3.googleusercontent.com/a/ACg8ocLVZm5ifvnrt8XYv1B2o5tsKXPy2G5a3GkrP8ZOtmFpwNHXBqF9=s96-c',
+  isGoogleAuth: true,
+  isLoggedIn: true,
+};
+
+export const ROGER_USER: UserSession = {
+  id: 'usr-roger',
   titlePrefix: 'Lic.',
-  personalName: '',
-  name: '',
-  email: '',
-  role: '',
-  specialty: '',
+  personalName: 'Roger Adan',
+  name: 'Lic. Roger Adan',
+  email: 'rogradan@gmail.com',
+  role: 'Licenciado en Enfermería',
+  specialty: 'Urgencias y Cuidados Críticos',
   phone: '',
   photoBlob: '',
   isGoogleAuth: true,
-  isLoggedIn: false,
+  isLoggedIn: true,
 };
+
+export const DEFAULT_USER: UserSession = SOFIA_USER;
 
 // Generates sample shifts (available on demand)
 export function generateSampleShifts(): MedicalShift[] {
@@ -228,13 +244,12 @@ export function generateSampleShifts(): MedicalShift[] {
 export function getStoredHospitals(): Hospital[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.HOSPITALS);
-    if (!raw) {
+    if (raw === null) {
       localStorage.setItem(STORAGE_KEYS.HOSPITALS, JSON.stringify(DEFAULT_HOSPITALS));
       return DEFAULT_HOSPITALS;
     }
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      localStorage.setItem(STORAGE_KEYS.HOSPITALS, JSON.stringify(DEFAULT_HOSPITALS));
+    if (!Array.isArray(parsed)) {
       return DEFAULT_HOSPITALS;
     }
     return parsed;

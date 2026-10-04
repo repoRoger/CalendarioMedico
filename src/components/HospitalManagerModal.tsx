@@ -10,7 +10,7 @@ interface HospitalManagerModalProps {
   isOpen: boolean;
   hospitals: Hospital[];
   onClose: () => void;
-  onSaveHospitals: (hospitals: Hospital[]) => void;
+  onSaveHospitals: (hospitals: Hospital[], deletedHospitalId?: string) => void;
 }
 
 const PRESET_GRADIENTS = [
@@ -139,7 +139,7 @@ export const HospitalManagerModal: React.FC<HospitalManagerModalProps> = ({
   const handleDelete = (id: string) => {
     const updated = list.filter((h) => h.id !== id);
     setList(updated);
-    onSaveHospitals(updated);
+    onSaveHospitals(updated, id);
     setConfirmDeleteId(null);
     if (editingHospital?.id === id) {
       setEditingHospital(null);

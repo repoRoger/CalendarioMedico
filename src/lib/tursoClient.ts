@@ -231,6 +231,20 @@ export async function syncLocalDataToTurso(
       }
     }
 
+    // Clean up any hospitals deleted locally for this user
+    if (hospitals.length > 0) {
+      const hPlaceholders = hospitals.map(() => '?').join(',');
+      await client.execute({
+        sql: `DELETE FROM hospitales WHERE cliente_correo = ? AND id NOT IN (${hPlaceholders})`,
+        args: [email, ...hospitals.map((h) => h.id)],
+      });
+    } else {
+      await client.execute({
+        sql: `DELETE FROM hospitales WHERE cliente_correo = ?`,
+        args: [email],
+      });
+    }
+
     // Save shifts
     for (const s of shifts) {
       await client.execute({
@@ -368,6 +382,27 @@ export function mergeHospitals(local: Hospital[], remote: Hospital[]): Hospital[
     }
   }
   return Array.from(map.values());
+}
+
+/**
+ * Deletes a single hospital directly from Turso database immediately.
+ */
+export async function deleteHospitalFromTurso(
+  client: Client,
+  clienteCorreo: string,
+  hospitalId: string
+): Promise<boolean> {
+  try {
+    const email = clienteCorreo.trim().toLowerCase();
+    await client.execute({
+      sql: `DELETE FROM hospitales WHERE cliente_correo = ? AND id = ?`,
+      args: [email, hospitalId],
+    });
+    return true;
+  } catch (err) {
+    console.warn('Error deleting hospital from Turso:', err);
+    return false;
+  }
 }
 
 /**
