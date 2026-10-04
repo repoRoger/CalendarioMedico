@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { CalendarDayItem, SPANISH_WEEKDAYS, formatFriendlyDate, SPANISH_MONTHS } from '../lib/timeUtils';
 import { MedicalShift, Hospital } from '../types';
+import { getHospitalForShift } from '../lib/storage';
 
 interface CalendarWeekViewProps {
   days: CalendarDayItem[];
@@ -161,7 +162,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                 {/* Shifts inside this day */}
                 <div className="space-y-1.5">
                   {dayShifts.map((shift) => {
-                    const hosp = hospitals.find((h) => h.id === shift.hospitalId);
+                    const hosp = getHospitalForShift(shift, hospitals);
 
                     return (
                       <div
@@ -172,7 +173,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                         }}
                       >
                         <div className="flex items-center justify-between gap-1 font-bold">
-                          <span className="truncate">{hosp?.shortName || 'Centro'}</span>
+                          <span className="truncate">{hosp?.shortName || hosp?.name || 'Centro'}</span>
                           <span className="bg-black/25 px-1 py-0.2 rounded font-mono text-[10px]">
                             {shift.shiftCode}
                           </span>

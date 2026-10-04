@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Hospital, MedicalShift, ShiftCode, ShiftTemplate } from '../types';
 import { calculateShiftHours, formatFriendlyDate } from '../lib/timeUtils';
+import { DEFAULT_HOSPITALS, getHospitalForShift } from '../lib/storage';
 
 interface DayEditModalProps {
   isOpen: boolean;
@@ -34,16 +35,24 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       if (existingShifts && existingShifts.length > 0) {
-        setShifts(JSON.parse(JSON.stringify(existingShifts)));
+        // Sanitize shifts so hospitalId is always valid
+        const sanitized: MedicalShift[] = existingShifts.map((s) => {
+          if (!s.hospitalId) {
+            const resolved = getHospitalForShift(s, hospitals);
+            return { ...s, hospitalId: resolved.id };
+          }
+          return s;
+        });
+        setShifts(sanitized);
       } else {
         setShifts([]);
       }
     }
-  }, [isOpen, existingShifts]);
+  }, [isOpen, existingShifts, hospitals]);
 
   if (!isOpen) return null;
 
-  const defaultHospitalId = hospitals[0]?.id || '';
+  const defaultHospitalId = hospitals[0]?.id || DEFAULT_HOSPITALS[0].id;
 
   const handleAddShift = (templateCode: ShiftCode = 'M', preferredHospitalId?: string) => {
     const tpl = templates.find((t) => t.code === templateCode) || templates[0];

@@ -7,6 +7,7 @@ import { MedicalShift, Hospital } from '../types';
 import {
   formatFriendlyDate, getHondurasTodayIso, getHondurasTomorrowIso
 } from '../lib/timeUtils';
+import { getHospitalForShift } from '../lib/storage';
 
 interface ShiftListViewProps {
   shifts: MedicalShift[];
@@ -153,7 +154,7 @@ export const ShiftListView: React.FC<ShiftListViewProps> = ({
                 {/* Shifts of this date */}
                 <div className="space-y-2 pt-1">
                   {group.shifts.map((shift, idx) => {
-                    const hosp = hospitals.find((h) => h.id === shift.hospitalId);
+                    const hosp = getHospitalForShift(shift, hospitals);
 
                     return (
                       <div

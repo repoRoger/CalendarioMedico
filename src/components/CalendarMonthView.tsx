@@ -2,6 +2,7 @@ import React from 'react';
 import { Plus, Clock, Moon, Sparkles, Building2 } from 'lucide-react';
 import { CalendarDayItem, SPANISH_WEEKDAYS } from '../lib/timeUtils';
 import { MedicalShift, Hospital } from '../types';
+import { getHospitalForShift } from '../lib/storage';
 
 interface CalendarMonthViewProps {
   days: CalendarDayItem[];
@@ -120,7 +121,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
               {/* Day Shifts Chips (supports 1, 2, 3 or more shifts!) */}
               <div className="flex-1 space-y-1 overflow-hidden">
                 {dayShifts.slice(0, 3).map((shift, idx) => {
-                  const hosp = hospitals.find((h) => h.id === shift.hospitalId);
+                  const hosp = getHospitalForShift(shift, hospitals);
                   const gradStart = hosp?.gradientStart || '#0d9488';
                   const gradEnd = hosp?.gradientEnd || '#059669';
 
@@ -138,7 +139,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                           {shift.shiftCode}
                         </span>
                         <span className="truncate font-medium text-[10.5px]">
-                          {hosp?.shortName || shift.title}
+                          {hosp?.shortName || hosp?.name || shift.title}
                         </span>
                       </div>
 
@@ -171,7 +172,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
               {dayShifts.length > 1 && (
                 <div className="flex items-center gap-1 pt-1 justify-end">
                   {dayShifts.map((s, i) => {
-                    const h = hospitals.find((item) => item.id === s.hospitalId);
+                    const h = getHospitalForShift(s, hospitals);
                     return (
                       <span
                         key={i}

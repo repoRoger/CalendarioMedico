@@ -229,12 +229,53 @@ export function getStoredHospitals(): Hospital[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.HOSPITALS);
     if (!raw) {
-      return [];
+      localStorage.setItem(STORAGE_KEYS.HOSPITALS, JSON.stringify(DEFAULT_HOSPITALS));
+      return DEFAULT_HOSPITALS;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem(STORAGE_KEYS.HOSPITALS, JSON.stringify(DEFAULT_HOSPITALS));
+      return DEFAULT_HOSPITALS;
+    }
+    return parsed;
   } catch {
-    return [];
+    return DEFAULT_HOSPITALS;
   }
+}
+
+/**
+ * Resilient hospital resolver for any shift.
+ * Guarantees a matching hospital object with valid name and shortName.
+ */
+export function getHospitalForShift(shift: MedicalShift, hospitals: Hospital[]): Hospital {
+  // 1. Direct ID match in provided hospitals
+  let found = hospitals.find((h) => h.id === shift.hospitalId);
+  if (found) return found;
+
+  // 2. Direct ID match in default hospitals
+  found = DEFAULT_HOSPITALS.find((h) => h.id === shift.hospitalId);
+  if (found) return found;
+
+  // 3. Name or substring match (e.g. 'bendana' -> 'Hospital Bandaña')
+  if (shift.hospitalId) {
+    const rawId = shift.hospitalId.toLowerCase();
+    found = hospitals.find((h) => {
+      const hText = `${h.name} ${h.shortName}`.toLowerCase();
+      if ((rawId.includes('bendana') || rawId.includes('bandana')) && (hText.includes('benda') || hText.includes('banda'))) return true;
+      if (rawId.includes('catarino') && hText.includes('catarino')) return true;
+      if (rawId.includes('cemesa') && hText.includes('cemesa')) return true;
+      return false;
+    });
+    if (found) return found;
+  }
+
+  // 4. Fallback to first user hospital if available
+  if (hospitals.length > 0) {
+    return hospitals[0];
+  }
+
+  // 5. Ultimate fallback to default preset
+  return DEFAULT_HOSPITALS[0];
 }
 
 export function saveStoredHospitals(hospitals: Hospital[]): void {

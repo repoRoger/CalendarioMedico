@@ -4,6 +4,7 @@ import {
   ChevronRight, ArrowRight, UserCheck, Sparkles, AlertCircle
 } from 'lucide-react';
 import { Hospital, MedicalShift, UserSession } from '../types';
+import { getHospitalForShift } from '../lib/storage';
 import {
   getHondurasDate, getHondurasTodayIso, getHondurasTomorrowIso,
   SPANISH_MONTHS, SPANISH_WEEKDAYS_FULL, formatFriendlyDate
@@ -94,7 +95,7 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
             {todayShifts.length > 0 ? (
               <div className="space-y-3">
                 {todayShifts.map((shift, idx) => {
-                  const hosp = hospitals.find((h) => h.id === shift.hospitalId);
+                  const hosp = getHospitalForShift(shift, hospitals);
                   return (
                     <div
                       key={shift.id || idx}
@@ -201,7 +202,7 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
             {tomorrowShifts.length > 0 ? (
               <div className="space-y-3">
                 {tomorrowShifts.map((shift, idx) => {
-                  const hosp = hospitals.find((h) => h.id === shift.hospitalId);
+                  const hosp = getHospitalForShift(shift, hospitals);
                   return (
                     <div
                       key={shift.id || idx}
@@ -303,7 +304,7 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {futureShifts.map((shift, idx) => {
-              const hosp = hospitals.find((h) => h.id === shift.hospitalId);
+              const hosp = getHospitalForShift(shift, hospitals);
               return (
                 <div
                   key={shift.id || idx}
