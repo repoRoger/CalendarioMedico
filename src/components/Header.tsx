@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, LogOut, BarChart3, Share2, RefreshCw } from 'lucide-react';
 import { UserSession } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   user: UserSession;
@@ -52,8 +53,11 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </button>
 
-        {/* Right: Quick actions (Sync, Stats, Export, Logout) */}
+        {/* Right: Quick actions (Install PWA, Sync, Stats, Export, Logout) */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* PWA Install Button (Prompt full screen install) */}
+          <PWAInstallButton variant="header" />
+
           {onSyncCloud && (
             <button
               onClick={onSyncCloud}

@@ -24,7 +24,14 @@ export const AppBottomNav: React.FC<AppBottomNavProps> = ({
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/90 shadow-2xl">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-45 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/90 shadow-2xl transition-all"
+      style={{
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        transform: 'translateZ(0)',
+        WebkitTransform: 'translateZ(0)',
+      }}
+    >
       <div className="max-w-xl mx-auto px-2">
         <div className="grid grid-cols-5 items-center h-16">
           {navItems.map((item) => {

@@ -514,7 +514,7 @@ export default function App() {
   const month24hDaysCount = Object.values(hoursPerDayMap).filter((h) => h >= 24).length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans pb-16 md:pb-6">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans pb-28 sm:pb-32">
       {/* Top Bar: Shows user title & name (Lic. Roger Adan) and cloud sync button */}
       <Header
         user={user}
