@@ -21,6 +21,9 @@ import { AppBottomNav, MainAppSection } from './components/AppBottomNav';
 import { ProximosView } from './components/ProximosView';
 import { WorkplacesListView } from './components/WorkplacesListView';
 import { WorkplaceModal } from './components/WorkplaceModal';
+import { ProfileReportView } from './components/ProfileReportView';
+import { SettingsListView } from './components/SettingsListView';
+import { TemplateModal } from './components/TemplateModal';
 import { CalendarMonthView } from './components/CalendarMonthView';
 import { CalendarWeekView } from './components/CalendarWeekView';
 import { ShiftListView } from './components/ShiftListView';
@@ -63,6 +66,10 @@ export default function App() {
   const [isWorkplaceModalOpen, setIsWorkplaceModalOpen] = useState(false);
   const [editingHospital, setEditingHospital] = useState<Hospital | null>(null);
 
+  // Template Modal State (Opens ONLY when creating or editing a shift template)
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<ShiftTemplate | null>(null);
+
   // LED Notifications
   const [notifications, setNotifications] = useState<LedMessage[]>([]);
 
@@ -84,12 +91,24 @@ export default function App() {
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
 
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
+  const handlePrevDate = () => {
+    if (currentView === 'week') {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() - 7);
+      setCurrentDate(d);
+    } else {
+      setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
+    }
   };
 
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+  const handleNextDate = () => {
+    if (currentView === 'week') {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() + 7);
+      setCurrentDate(d);
+    } else {
+      setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+    }
   };
 
   const handleToday = () => {
@@ -97,16 +116,7 @@ export default function App() {
   };
 
   const handleSelectSection = (section: MainAppSection) => {
-    if (section === 'perfil') {
-      setIsProfileModalOpen(true);
-      return;
-    }
-    if (section === 'ajustes') {
-      setSettingsInitialTab('templates');
-      setIsSettingsModalOpen(true);
-      return;
-    }
-    // 'trabajos', 'calendario', 'proximos' navigate smoothly to that full screen view!
+    // All 5 sections navigate smoothly to their dedicated full-screen views!
     setActiveSection(section);
   };
 
@@ -121,6 +131,19 @@ export default function App() {
       addNotification('success', 'Lugar creado', `Se agregó ${savedHosp.shortName}`);
     }
     handleSaveHospitals(updated);
+  };
+
+  const handleSaveTemplateFromModal = (savedTpl: ShiftTemplate) => {
+    let updated: ShiftTemplate[];
+    const exists = templates.some((t) => t.id === savedTpl.id);
+    if (exists) {
+      updated = templates.map((t) => (t.id === savedTpl.id ? savedTpl : t));
+      addNotification('success', 'Turno actualizado', `Se actualizó ${savedTpl.name}`);
+    } else {
+      updated = [...templates, savedTpl];
+      addNotification('success', 'Turno creado', `Se agregó ${savedTpl.name}`);
+    }
+    handleSaveTemplates(updated);
   };
 
   // Login handler
@@ -366,9 +389,9 @@ export default function App() {
               {/* Month / Year Navigator */}
               <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-2xl p-1 self-start sm:self-auto shadow-inner">
                 <button
-                  onClick={handlePrevMonth}
+                  onClick={handlePrevDate}
                   className="p-2 hover:bg-slate-800 text-slate-400 hover:text-slate-100 rounded-xl transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center active:scale-95"
-                  title="Mes anterior"
+                  title={currentView === 'week' ? 'Semana anterior' : 'Mes anterior'}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -376,15 +399,17 @@ export default function App() {
                 <button
                   onClick={handleToday}
                   className="px-3 py-1.5 text-sm font-extrabold text-slate-100 hover:text-teal-300 transition-colors capitalize text-center min-w-[130px] sm:min-w-[160px] tracking-tight"
-                  title="Ir al mes actual (Hoy)"
+                  title="Ir al mes o semana actual (Hoy)"
                 >
-                  {SPANISH_MONTHS[currentMonth]} {currentYear}
+                  {currentView === 'week'
+                    ? `Semana: ${weekDays[0]?.dayNumber} al ${weekDays[6]?.dayNumber} ${SPANISH_MONTHS[currentMonth]?.slice(0, 3)}`
+                    : `${SPANISH_MONTHS[currentMonth]} ${currentYear}`}
                 </button>
 
                 <button
-                  onClick={handleNextMonth}
+                  onClick={handleNextDate}
                   className="p-2 hover:bg-slate-800 text-slate-400 hover:text-slate-100 rounded-xl transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center active:scale-95"
-                  title="Mes siguiente"
+                  title={currentView === 'week' ? 'Semana siguiente' : 'Mes siguiente'}
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -549,6 +574,9 @@ export default function App() {
                 hospitals={hospitals}
                 filteredHospitalId={hospitalFilter}
                 onSelectDate={(date) => setSelectedDateForModal(date)}
+                onPrevWeek={handlePrevDate}
+                onNextWeek={handleNextDate}
+                onToday={handleToday}
               />
             )}
 
@@ -560,6 +588,32 @@ export default function App() {
               />
             )}
           </div>
+        )}
+
+        {/* VIEW 4: PERFIL (Ficha técnica y reporte del usuario en pantalla completa) */}
+        {activeSection === 'perfil' && (
+          <ProfileReportView
+            user={user}
+            hospitals={hospitals}
+            shifts={shifts}
+            onOpenEditModal={() => setIsProfileModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
+        {/* VIEW 5: AJUSTES (Listado de horarios y turnos en pantalla completa) */}
+        {activeSection === 'ajustes' && (
+          <SettingsListView
+            templates={templates}
+            onOpenCreate={() => {
+              setEditingTemplate(null);
+              setIsTemplateModalOpen(true);
+            }}
+            onOpenEdit={(tpl) => {
+              setEditingTemplate(tpl);
+              setIsTemplateModalOpen(true);
+            }}
+          />
         )}
       </main>
 
@@ -597,6 +651,19 @@ export default function App() {
             setEditingHospital(null);
           }}
           onSave={handleSaveHospitalFromModal}
+        />
+      )}
+
+      {/* POPUP: Template Modal (Opens ONLY when creating or editing a shift template) */}
+      {isTemplateModalOpen && (
+        <TemplateModal
+          isOpen={isTemplateModalOpen}
+          template={editingTemplate}
+          onClose={() => {
+            setIsTemplateModalOpen(false);
+            setEditingTemplate(null);
+          }}
+          onSave={handleSaveTemplateFromModal}
         />
       )}
 

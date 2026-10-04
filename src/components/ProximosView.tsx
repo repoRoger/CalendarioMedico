@@ -67,33 +67,6 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-4xl mx-auto">
-      {/* Welcome Banner with Honduras Local Time indicator */}
-      <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-teal-950/40 border border-slate-800 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[11px] font-semibold text-emerald-300 uppercase tracking-wider">
-              Hora local Honduras (UTC-6)
-            </span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-            ¡Hola, {user.name}!
-          </h1>
-          <p className="text-xs text-slate-400">
-            Aquí tienes tus turnos más próximos para hoy y mañana.
-          </p>
-        </div>
-
-        <button
-          onClick={onGoToCalendar}
-          className="self-start sm:self-center px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-teal-300 hover:text-white rounded-2xl text-xs font-bold border border-slate-700 flex items-center gap-2 transition-all shadow-md active:scale-95"
-        >
-          <Calendar className="w-4 h-4 text-teal-400" />
-          <span>Ver Calendario Completo</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
       {/* Main Focus: Two Columns (HOY / MAÑANA) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* CARD 1: HOY */}
