@@ -39,7 +39,7 @@ import {
   fetchUserProfileFromTurso, fetchShiftsFromTurso, fetchHospitalsFromTurso,
   mergeShifts, mergeHospitals, deleteHospitalFromTurso
 } from './lib/tursoClient';
-import { generateSampleShifts } from './lib/storage';
+import { generateSampleShifts, ROGER_USER } from './lib/storage';
 
 export default function App() {
   const [currentDate, setCurrentDate] = useState(() => getHondurasDate());
@@ -193,8 +193,31 @@ export default function App() {
     }
   };
 
-  // Auto-fetch from Turso on app load/mount
+  // Auto-fetch from Turso on app load/mount based strictly on logged-in user
   useEffect(() => {
+    // If device was temporarily previewing Sofia, reset cleanly to Roger
+    if (user.email && user.email.toLowerCase().includes('sofia')) {
+      const roger = ROGER_USER;
+      setUser(roger);
+      saveStoredUser(roger);
+      if (tursoConfig.databaseUrl && tursoConfig.authToken) {
+        const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+        fetchShiftsFromTurso(client, 'rogradan@gmail.com').then((s) => {
+          if (s) {
+            setShifts(s);
+            saveStoredShifts(s);
+          }
+        });
+        fetchHospitalsFromTurso(client, 'rogradan@gmail.com').then((h) => {
+          if (h) {
+            setHospitals(h);
+            saveStoredHospitals(h);
+          }
+        });
+      }
+      return;
+    }
+
     if (user.email && user.isLoggedIn) {
       handleSyncCloud(true);
     }
@@ -359,61 +382,6 @@ export default function App() {
     }
   };
 
-  // Quick account switch between Roger and Sofia instantly
-  const handleSwitchAccount = async (targetEmail: string) => {
-    setIsSyncingCloud(true);
-    try {
-      const cleanEmail = targetEmail.trim().toLowerCase();
-      const isTargetSofia = cleanEmail.includes('sofia');
-      const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-
-      const remoteProfile = await fetchUserProfileFromTurso(client, cleanEmail);
-      const remoteShifts = await fetchShiftsFromTurso(client, cleanEmail);
-      const remoteHospitals = await fetchHospitalsFromTurso(client, cleanEmail);
-
-      const switchedUser: UserSession = {
-        id: `usr-${Date.now()}`,
-        email: cleanEmail,
-        titlePrefix: remoteProfile?.titlePrefix || (isTargetSofia ? 'Téc.' : 'Lic.'),
-        personalName: remoteProfile?.personalName || (isTargetSofia ? 'Sofía Hernández' : 'Roger Adan'),
-        name: remoteProfile?.name || (isTargetSofia ? 'Téc. Sofía Hernández' : 'Lic. Roger Adan'),
-        role: remoteProfile?.role || (isTargetSofia ? 'Técnico Instrumentista Quirúrgico' : 'Licenciado en Enfermería'),
-        specialty: remoteProfile?.specialty || (isTargetSofia ? 'Sala de Operaciones' : 'Urgencias y Cuidados Críticos'),
-        phone: remoteProfile?.phone || (isTargetSofia ? '95103405' : ''),
-        photoBlob: remoteProfile?.photoBlob || (isTargetSofia ? 'https://lh3.googleusercontent.com/a/ACg8ocLVZm5ifvnrt8XYv1B2o5tsKXPy2G5a3GkrP8ZOtmFpwNHXBqF9=s96-c' : ''),
-        isLoggedIn: true,
-        isGoogleAuth: true,
-      };
-
-      setUser(switchedUser);
-      saveStoredUser(switchedUser);
-
-      const finalShifts = remoteShifts || [];
-      setShifts(finalShifts);
-      saveStoredShifts(finalShifts);
-
-      const finalHospitals = remoteHospitals || [];
-      setHospitals(finalHospitals);
-      saveStoredHospitals(finalHospitals);
-
-      addNotification('success', `Cuenta activa: ${switchedUser.name}`, `Se mostraron ${finalShifts.length} turnos desde Turso.`);
-    } catch (err: any) {
-      addNotification('warning', 'Error al cambiar cuenta', err.message);
-    } finally {
-      setIsSyncingCloud(false);
-    }
-  };
-
-  // Default to Sofia's account so Roger can inspect it immediately in the preview
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('user') === 'roger') {
-      handleSwitchAccount('rogradan@gmail.com');
-    } else {
-      handleSwitchAccount('sofiahernandez02311@gmail.com');
-    }
-  }, []);
-
   // Handlers for data updates
   const handleSaveDayShifts = (date: string, updatedDayShifts: MedicalShift[]) => {
     const filtered = shifts.filter((s) => s.date !== date);
@@ -547,7 +515,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans pb-16 md:pb-6">
-      {/* Top Bar: Shows user title & name and quick account switch */}
+      {/* Top Bar: Shows user title & name (Lic. Roger Adan) and cloud sync button */}
       <Header
         user={user}
         onOpenProfile={() => setIsProfileModalOpen(true)}
@@ -556,39 +524,10 @@ export default function App() {
         onOpenStats={() => setIsStatsModalOpen(true)}
         onOpenExport={() => setIsExportModalOpen(true)}
         onLogout={handleLogout}
-        onSwitchAccount={handleSwitchAccount}
       />
 
       {/* Main Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 pb-24 space-y-4">
-        {/* Quick User Account Banner */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-md text-xs">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-slate-400">Cuenta activa en Turso:</span>
-            <strong className="text-slate-100 font-bold flex items-center gap-1.5 flex-wrap">
-              <span>{user.name}</span>
-              <span className="text-[10px] text-teal-400 bg-teal-950/60 border border-teal-800/40 px-2 py-0.5 rounded-md font-mono">
-                {shifts.length} turnos
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
-                ({user.email})
-              </span>
-            </strong>
-          </div>
-
-          <button
-            onClick={() => handleSwitchAccount(user.email.includes('sofia') ? 'rogradan@gmail.com' : 'sofiahernandez02311@gmail.com')}
-            disabled={isSyncingCloud}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border active:scale-95 shadow-sm ${
-              user.email.includes('sofia')
-                ? 'bg-teal-950/70 border-teal-500/50 text-teal-300 hover:bg-teal-900/80 shadow-teal-950/40'
-                : 'bg-purple-950/70 border-purple-500/50 text-purple-300 hover:bg-purple-900/80 shadow-purple-950/40'
-            }`}
-          >
-            <span>⇄ {user.email.includes('sofia') ? 'Ver cuenta de Roger' : 'Ver cuenta de Sofía'}</span>
-          </button>
-        </div>
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 pb-24">
         {/* VIEW 1: PRÓXIMOS (Página principal por defecto al entrar) */}
         {activeSection === 'proximos' && (
           <ProximosView

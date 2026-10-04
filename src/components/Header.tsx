@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, LogOut, BarChart3, Share2, RefreshCw, ArrowLeftRight } from 'lucide-react';
+import { User, LogOut, BarChart3, Share2, RefreshCw } from 'lucide-react';
 import { UserSession } from '../types';
 
 interface HeaderProps {
@@ -10,7 +10,6 @@ interface HeaderProps {
   onOpenStats?: () => void;
   onOpenExport?: () => void;
   onLogout: () => void;
-  onSwitchAccount?: (email: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -21,9 +20,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenStats,
   onOpenExport,
   onLogout,
-  onSwitchAccount,
 }) => {
-  const isSofia = user.email.toLowerCase().includes('sofia');
   return (
     <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-6 py-2.5">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
@@ -55,25 +52,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </button>
 
-        {/* Right: Quick actions (Switch Account, Sync, Stats, Export, Logout) */}
+        {/* Right: Quick actions (Sync, Stats, Export, Logout) */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Quick Account Switcher between Roger and Sofia */}
-          {onSwitchAccount && (
-            <button
-              onClick={() => onSwitchAccount(isSofia ? 'rogradan@gmail.com' : 'sofiahernandez02311@gmail.com')}
-              disabled={isSyncingCloud}
-              className={`p-2 sm:px-3 sm:py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 min-h-[38px] active:scale-95 shadow-md ${
-                isSofia
-                  ? 'bg-teal-950/70 border-teal-500/50 text-teal-300 hover:bg-teal-900/80 shadow-teal-950/50'
-                  : 'bg-purple-950/70 border-purple-500/50 text-purple-300 hover:bg-purple-900/80 shadow-purple-950/50'
-              }`}
-              title={isSofia ? 'Cambiar a cuenta de Roger (rogradan@gmail.com)' : 'Ver cuenta de Sofía (sofiahernandez02311@gmail.com)'}
-            >
-              <ArrowLeftRight className="w-3.5 h-3.5" />
-              <span>{isSofia ? 'Ver Roger' : 'Ver Sofía'}</span>
-            </button>
-          )}
-
           {onSyncCloud && (
             <button
               onClick={onSyncCloud}

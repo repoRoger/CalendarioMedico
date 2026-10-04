@@ -156,7 +156,7 @@ export const ROGER_USER: UserSession = {
   isLoggedIn: true,
 };
 
-export const DEFAULT_USER: UserSession = SOFIA_USER;
+export const DEFAULT_USER: UserSession = ROGER_USER;
 
 // Generates sample shifts (available on demand)
 export function generateSampleShifts(): MedicalShift[] {

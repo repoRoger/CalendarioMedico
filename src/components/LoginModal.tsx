@@ -160,27 +160,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
             </form>
           )}
-
-          {/* Quick profile selector cards */}
-          <div className="pt-2 grid grid-cols-2 gap-2 text-left">
-            <button
-              type="button"
-              onClick={() => onLogin('sofiahernandez02311@gmail.com', 'Sofía Hernández', 'https://lh3.googleusercontent.com/a/ACg8ocLVZm5ifvnrt8XYv1B2o5tsKXPy2G5a3GkrP8ZOtmFpwNHXBqF9=s96-c')}
-              className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 transition-all text-xs"
-            >
-              <div className="font-bold text-purple-300 truncate">Téc. Sofía Hernández</div>
-              <div className="text-[10px] text-slate-500 truncate font-mono">55 turnos en Turso</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onLogin('rogradan@gmail.com', 'Roger Adan', '')}
-              className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-teal-500/50 transition-all text-xs"
-            >
-              <div className="font-bold text-teal-300 truncate">Lic. Roger Adan</div>
-              <div className="text-[10px] text-slate-500 truncate font-mono">23 turnos en Turso</div>
-            </button>
-          </div>
         </div>
 
         {/* Security badge note */}
