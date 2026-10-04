@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   User, Edit2, Mail, Phone, Award, ShieldCheck, Database,
-  Building2, Calendar, Clock, LogOut, CheckCircle2, MapPin, RefreshCw
+  Building2, Calendar, Clock, LogOut, CheckCircle2, MapPin, RefreshCw, Plus
 } from 'lucide-react';
 import { UserSession, Hospital, MedicalShift } from '../types';
 
@@ -11,6 +11,7 @@ interface ProfileReportViewProps {
   shifts: MedicalShift[];
   onOpenEditModal: () => void;
   onManualSync?: () => Promise<void> | void;
+  onLoadSampleShifts?: () => void;
   onLogout: () => void;
 }
 
@@ -20,6 +21,7 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
   shifts,
   onOpenEditModal,
   onManualSync,
+  onLoadSampleShifts,
   onLogout,
 }) => {
   const [isSyncing, setIsSyncing] = useState(false);
@@ -184,7 +186,18 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+            {onLoadSampleShifts && (
+              <button
+                onClick={onLoadSampleShifts}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-all active:scale-95 min-h-[38px]"
+                title="Cargar y combinar turnos de muestra de Octubre"
+              >
+                <Plus className="w-3.5 h-3.5 text-teal-400" />
+                <span>+ Turnos de Muestra</span>
+              </button>
+            )}
+
             {onManualSync && (
               <button
                 onClick={handleSyncClick}

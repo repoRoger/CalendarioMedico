@@ -36,8 +36,10 @@ import { ExportModal } from './components/ExportModal';
 import { LedNotification, LedMessage } from './components/LedNotification';
 import {
   getTursoClient, syncLocalDataToTurso, saveUserProfileToTurso,
-  fetchUserProfileFromTurso, fetchShiftsFromTurso, fetchHospitalsFromTurso
+  fetchUserProfileFromTurso, fetchShiftsFromTurso, fetchHospitalsFromTurso,
+  mergeShifts, mergeHospitals
 } from './lib/tursoClient';
+import { generateSampleShifts } from './lib/storage';
 
 export default function App() {
   const [currentDate, setCurrentDate] = useState(() => getHondurasDate());
@@ -90,7 +92,7 @@ export default function App() {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
-  // Sync Cloud bidirectional (fetch latest from Turso, or upload local if remote is empty)
+  // Sync Cloud bidirectional (merge local and remote without dropping either!)
   const handleSyncCloud = async (isSilent = false) => {
     if (!user.email || !tursoConfig.databaseUrl || !tursoConfig.authToken) {
       if (!isSilent) addNotification('warning', 'Sin sesión', 'Inicia sesión con tu correo para sincronizar.');
@@ -101,35 +103,32 @@ export default function App() {
     try {
       const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
 
-      // 1. Fetch remote shifts for this user from Turso
+      // 1. Fetch remote shifts and hospitals for this user from Turso
       const remoteShifts = await fetchShiftsFromTurso(client, user.email);
-
-      if (remoteShifts && remoteShifts.length > 0) {
-        setShifts(remoteShifts);
-        saveStoredShifts(remoteShifts);
-        if (!isSilent) {
-          addNotification(
-            'success',
-            'Nube Turso sincronizada',
-            `Se descargaron ${remoteShifts.length} turnos desde Turso.`
-          );
-        }
-      } else if (shifts.length > 0) {
-        // If remote has no shifts for this user, upload local shifts to Turso
-        const res = await syncLocalDataToTurso(client, user.email, shifts, hospitals, templates);
-        if (!isSilent && res.success) {
-          addNotification('success', 'Nube Turso actualizada', `Guardados ${shifts.length} turnos.`);
-        }
-      }
-
-      // 2. Fetch remote hospitals
       const remoteHospitals = await fetchHospitalsFromTurso(client, user.email);
-      if (remoteHospitals && remoteHospitals.length > 0) {
-        setHospitals(remoteHospitals);
-        saveStoredHospitals(remoteHospitals);
+
+      // 2. TRUE BIDIRECTIONAL MERGE: Combine local + remote
+      const combinedShifts = mergeShifts(shifts, remoteShifts);
+      const combinedHospitals = mergeHospitals(hospitals, remoteHospitals);
+
+      setShifts(combinedShifts);
+      saveStoredShifts(combinedShifts);
+
+      setHospitals(combinedHospitals);
+      saveStoredHospitals(combinedHospitals);
+
+      // 3. Upload combined set to Turso so Turso has everything from both devices
+      await syncLocalDataToTurso(client, user.email, combinedShifts, combinedHospitals, templates);
+
+      if (!isSilent) {
+        addNotification(
+          'success',
+          'Nube Turso sincronizada',
+          `Sincronizados ${combinedShifts.length} turnos totales.`
+        );
       }
 
-      // 3. Fetch remote profile
+      // 4. Fetch remote profile
       const remoteProfile = await fetchUserProfileFromTurso(client, user.email);
       if (remoteProfile) {
         setUser((prev) => {
@@ -145,6 +144,28 @@ export default function App() {
       }
     } finally {
       setIsSyncingCloud(false);
+    }
+  };
+
+  // Allows user to reload/merge full sample shifts for October if they want
+  const handleLoadSampleShifts = async () => {
+    const samples = generateSampleShifts();
+    const merged = mergeShifts(shifts, samples);
+    setShifts(merged);
+    saveStoredShifts(merged);
+    addNotification(
+      'success',
+      'Turnos cargados',
+      `Se agregaron turnos de muestra (${merged.length} turnos en total).`
+    );
+
+    if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
+      try {
+        const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+        await syncLocalDataToTurso(client, user.email, merged, hospitals, templates);
+      } catch (err) {
+        console.warn('Sync sample error:', err);
+      }
     }
   };
 
@@ -690,6 +711,7 @@ export default function App() {
             shifts={shifts}
             onOpenEditModal={() => setIsProfileModalOpen(true)}
             onManualSync={handleManualTursoSync}
+            onLoadSampleShifts={handleLoadSampleShifts}
             onLogout={handleLogout}
           />
         )}

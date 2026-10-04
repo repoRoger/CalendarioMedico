@@ -326,6 +326,51 @@ export async function fetchTursoStats(
 }
 
 /**
+ * Smart Bidirectional Shift Merger:
+ * Combines local shifts with remote shifts without dropping either.
+ */
+export function mergeShifts(local: MedicalShift[], remote: MedicalShift[]): MedicalShift[] {
+  const map = new Map<string, MedicalShift>();
+
+  // Add all remote shifts first
+  for (const s of remote) {
+    map.set(s.id, s);
+  }
+
+  // Add local shifts (prevent duplicate if date, time, and hospital match)
+  for (const s of local) {
+    if (!map.has(s.id)) {
+      const duplicate = Array.from(map.values()).find(
+        (existing) =>
+          existing.date === s.date &&
+          existing.startTime === s.startTime &&
+          existing.hospitalId === s.hospitalId
+      );
+      if (!duplicate) {
+        map.set(s.id, s);
+      }
+    }
+  }
+
+  return Array.from(map.values()).sort(
+    (a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
+  );
+}
+
+export function mergeHospitals(local: Hospital[], remote: Hospital[]): Hospital[] {
+  const map = new Map<string, Hospital>();
+  for (const h of remote) {
+    map.set(h.id, h);
+  }
+  for (const h of local) {
+    if (!map.has(h.id)) {
+      map.set(h.id, h);
+    }
+  }
+  return Array.from(map.values());
+}
+
+/**
  * Saves or updates user profile (including photo blob) directly in Turso.
  */
 export async function saveUserProfileToTurso(client: Client, user: UserSession): Promise<boolean> {
