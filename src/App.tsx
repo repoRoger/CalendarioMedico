@@ -39,7 +39,7 @@ import {
   fetchUserProfileFromTurso, fetchShiftsFromTurso, fetchHospitalsFromTurso,
   mergeShifts, mergeHospitals, deleteHospitalFromTurso
 } from './lib/tursoClient';
-import { generateSampleShifts, ROGER_USER } from './lib/storage';
+import { generateSampleShifts, DEFAULT_HOSPITALS } from './lib/storage';
 
 export default function App() {
   const [currentDate, setCurrentDate] = useState(() => getHondurasDate());
@@ -195,29 +195,6 @@ export default function App() {
 
   // Auto-fetch from Turso on app load/mount based strictly on logged-in user
   useEffect(() => {
-    // If device was temporarily previewing Sofia, reset cleanly to Roger
-    if (user.email && user.email.toLowerCase().includes('sofia')) {
-      const roger = ROGER_USER;
-      setUser(roger);
-      saveStoredUser(roger);
-      if (tursoConfig.databaseUrl && tursoConfig.authToken) {
-        const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-        fetchShiftsFromTurso(client, 'rogradan@gmail.com').then((s) => {
-          if (s) {
-            setShifts(s);
-            saveStoredShifts(s);
-          }
-        });
-        fetchHospitalsFromTurso(client, 'rogradan@gmail.com').then((h) => {
-          if (h) {
-            setHospitals(h);
-            saveStoredHospitals(h);
-          }
-        });
-      }
-      return;
-    }
-
     if (user.email && user.isLoggedIn) {
       handleSyncCloud(true);
     }
@@ -285,84 +262,97 @@ export default function App() {
   // Login handler
   const handleLogin = async (email: string, personalName?: string, photoUrl?: string) => {
     const cleanEmail = email.trim().toLowerCase();
-    const cleanPrefix = user.titlePrefix || 'Licda.';
-    const cleanPersonal = personalName || user.personalName || 'Karen Rodríguez';
-    const fullName = `${cleanPrefix} ${cleanPersonal}`;
+    setIsSyncingCloud(true);
 
-    const loggedInUser: UserSession = {
-      ...user,
+    // 1. Immediately wipe previous session data from memory
+    setShifts([]);
+    setHospitals([]);
+
+    // 2. Build fresh active user
+    let activeUser: UserSession = {
       id: `usr-${Date.now()}`,
       email: cleanEmail,
-      titlePrefix: cleanPrefix,
-      personalName: cleanPersonal,
-      name: fullName,
-      photoBlob: user.photoBlob || photoUrl || '',
+      titlePrefix: '',
+      personalName: personalName || cleanEmail.split('@')[0],
+      name: personalName || cleanEmail.split('@')[0],
+      role: '',
+      specialty: '',
+      phone: '',
+      photoBlob: photoUrl || '',
       isLoggedIn: true,
+      isGoogleAuth: true,
     };
 
-    setUser(loggedInUser);
-    saveStoredUser(loggedInUser);
-
-    addNotification('success', 'Sesión iniciada', `Bienvenida/o, ${fullName}`);
-
-    // Fetch user profile and shifts from Turso if connected
+    // 3. Fetch THAT user's profile and shifts from Turso
     if (tursoConfig.databaseUrl && tursoConfig.authToken) {
       try {
         const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-        const remoteProfile = await fetchUserProfileFromTurso(client, cleanEmail);
+        const [remoteProfile, remoteShifts, remoteHospitals] = await Promise.all([
+          fetchUserProfileFromTurso(client, cleanEmail),
+          fetchShiftsFromTurso(client, cleanEmail),
+          fetchHospitalsFromTurso(client, cleanEmail),
+        ]);
+
         if (remoteProfile) {
-          const merged: UserSession = {
-            ...loggedInUser,
-            ...remoteProfile,
-            isLoggedIn: true,
+          activeUser = {
+            ...activeUser,
+            titlePrefix: remoteProfile.titlePrefix || activeUser.titlePrefix,
+            personalName: remoteProfile.personalName || activeUser.personalName,
+            name: remoteProfile.name || activeUser.name,
+            role: remoteProfile.role || activeUser.role,
+            specialty: remoteProfile.specialty || activeUser.specialty,
+            phone: remoteProfile.phone || activeUser.phone,
+            photoBlob: remoteProfile.photoBlob || photoUrl || activeUser.photoBlob,
           };
-          setUser(merged);
-          saveStoredUser(merged);
         }
 
-        const remoteShifts = await fetchShiftsFromTurso(client, cleanEmail);
-        const remoteHospitals = await fetchHospitalsFromTurso(client, cleanEmail);
+        const finalShifts = remoteShifts || [];
+        const finalHospitals = (remoteHospitals && remoteHospitals.length > 0) ? remoteHospitals : DEFAULT_HOSPITALS;
 
-        let finalShifts = remoteShifts || [];
-        if (shifts && shifts.length > 0) {
-          const unsyncedLocal = shifts.filter(
-            (localS) =>
-              !finalShifts.some(
-                (r) => r.id === localS.id || (r.date === localS.date && r.startTime === localS.startTime)
-              )
-          );
-          if (unsyncedLocal.length > 0) {
-            finalShifts = [...finalShifts, ...unsyncedLocal];
-            await syncLocalDataToTurso(
-              client,
-              cleanEmail,
-              finalShifts,
-              remoteHospitals && remoteHospitals.length > 0 ? remoteHospitals : hospitals,
-              templates
-            );
-          }
-        }
         setShifts(finalShifts);
         saveStoredShifts(finalShifts);
 
-        const finalHospitals = (remoteHospitals && remoteHospitals.length > 0) ? remoteHospitals : hospitals;
         setHospitals(finalHospitals);
         saveStoredHospitals(finalHospitals);
-      } catch (err) {
-        console.warn('Turso initial fetch error:', err);
+
+        addNotification('success', 'Sesión iniciada', `Bienvenido/a, ${activeUser.name} (${finalShifts.length} turnos cargados).`);
+      } catch (err: any) {
+        console.error('Error cargando datos de Turso:', err);
+        addNotification('warning', 'Aviso de conexión', 'No se pudieron descargar turnos de Turso');
+      } finally {
+        setIsSyncingCloud(false);
       }
+    } else {
+      setIsSyncingCloud(false);
+      addNotification('success', 'Sesión iniciada', `Bienvenido/a, ${activeUser.name}`);
     }
+
+    setUser(activeUser);
+    saveStoredUser(activeUser);
   };
 
   // Logout handler
   const handleLogout = () => {
-    const loggedOutUser: UserSession = {
-      ...user,
+    const emptyUser: UserSession = {
+      id: '',
+      titlePrefix: '',
+      personalName: '',
+      name: '',
+      email: '',
+      role: '',
+      specialty: '',
+      phone: '',
+      photoBlob: '',
       isLoggedIn: false,
+      isGoogleAuth: false,
     };
-    setUser(loggedOutUser);
-    saveStoredUser(loggedOutUser);
-    addNotification('info', 'Sesión cerrada', 'Ingresa tu correo para volver a entrar.');
+    setUser(emptyUser);
+    saveStoredUser(emptyUser);
+    setShifts([]);
+    saveStoredShifts([]);
+    setHospitals([]);
+    saveStoredHospitals([]);
+    addNotification('info', 'Sesión cerrada', 'Ingresa con tu correo para ver tus turnos.');
   };
 
   // Save profile ("Mis datos") handler
