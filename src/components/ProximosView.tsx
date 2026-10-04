@@ -75,8 +75,11 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
       {/* Main Focus: Two Columns (HOY / MAÑANA) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* CARD 1: HOY */}
-        <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col justify-between space-y-4 relative overflow-hidden">
-          <div className="space-y-3">
+        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-b from-slate-900 via-slate-900/95 to-teal-950/70 border border-slate-800 border-b-2 border-b-teal-500/60 shadow-xl shadow-teal-950/20 flex flex-col justify-between space-y-4 relative overflow-hidden">
+          {/* Sutil resplandor degradado en la parte inferior */}
+          <div className="absolute -bottom-10 -right-10 w-44 h-44 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="space-y-3 relative z-10">
             {/* Header: HOY | Fecha Grande (flex-1) | Botón + */}
             <div className="flex items-center justify-between gap-2.5 pb-3 border-b border-slate-800/80">
               <span className="px-2.5 py-1 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-black uppercase tracking-wider shrink-0">
@@ -182,8 +185,11 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
         </div>
 
         {/* CARD 2: MAÑANA */}
-        <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col justify-between space-y-4 relative overflow-hidden">
-          <div className="space-y-3">
+        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-b from-slate-900 via-slate-900/95 to-indigo-950/70 border border-slate-800 border-b-2 border-b-indigo-500/60 shadow-xl shadow-indigo-950/20 flex flex-col justify-between space-y-4 relative overflow-hidden">
+          {/* Sutil resplandor degradado en la parte inferior */}
+          <div className="absolute -bottom-10 -right-10 w-44 h-44 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="space-y-3 relative z-10">
             {/* Header: MAÑANA | Fecha Grande (flex-1) | Botón + */}
             <div className="flex items-center justify-between gap-2.5 pb-3 border-b border-slate-800/80">
               <span className="px-2.5 py-1 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 text-xs font-black uppercase tracking-wider shrink-0">

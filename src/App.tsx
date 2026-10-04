@@ -794,16 +794,16 @@ export default function App() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* "Todos los centros" pill */}
+                  {/* "Todos" pill */}
                   <button
                     onClick={() => setHospitalFilter('all')}
-                    className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 ${
+                    className={`min-h-[38px] px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 ${
                       hospitalFilter === 'all'
                         ? 'bg-teal-500 text-slate-950 font-bold shadow-md shadow-teal-500/20 ring-2 ring-teal-400'
                         : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700'
                     }`}
                   >
-                    <span>Todos los centros</span>
+                    <span>Todos</span>
                     <span className="bg-black/20 px-1.5 py-0.2 rounded text-[10.5px] font-mono">
                       {currentMonthShifts.length}
                     </span>

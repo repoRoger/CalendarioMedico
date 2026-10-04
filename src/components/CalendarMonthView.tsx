@@ -137,14 +137,14 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                       }}
                       title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${shift.hours}h${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                     >
-                      {/* Línea 1: TA - hora de inicio (e.g. TA - 07:00) */}
+                      {/* Línea 1: Turno grande y legible (e.g. TA, TB, TC, 24H) */}
                       <div className="flex items-center justify-between gap-1 leading-none font-mono">
-                        <span className="font-black text-[9.5px] sm:text-[10px] tracking-tight">
-                          {displayCode} - {shift.startTime.slice(0, 5)}
+                        <span className="font-black text-[12px] sm:text-[13px] tracking-wide text-white drop-shadow">
+                          {displayCode}
                         </span>
                         {shift.notes && (
                           <span
-                            className="text-[8px] leading-none shrink-0"
+                            className="text-[8.5px] leading-none shrink-0"
                             title={`Nota: ${shift.notes}`}
                           >
                             📝
@@ -153,7 +153,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                       </div>
 
                       {/* Línea 2: Nombre abreviado del centro de trabajo */}
-                      <div className="font-bold text-[9px] sm:text-[10px] leading-tight opacity-95 truncate mt-0.5">
+                      <div className="font-bold text-[9px] sm:text-[9.5px] leading-tight opacity-95 truncate mt-0.5">
                         {hospShortName}
                       </div>
                     </div>
