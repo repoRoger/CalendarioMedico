@@ -17,6 +17,7 @@ interface HeaderProps {
   onNextMonth: () => void;
   onToday: () => void;
   onOpenProfile: () => void;
+  onOpenTrabajos?: () => void;
   onOpenSettings: (tab?: 'hospitals' | 'templates') => void;
   onOpenStats: () => void;
   onOpenExport: () => void;
@@ -34,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   onNextMonth,
   onToday,
   onOpenProfile,
+  onOpenTrabajos,
   onOpenSettings,
   onOpenStats,
   onOpenExport,
@@ -102,6 +104,19 @@ export const Header: React.FC<HeaderProps> = ({
                   <Calendar className="w-4 h-4 text-teal-400" />
                   <span className="font-medium">Calendario</span>
                 </button>
+
+                {onOpenTrabajos && (
+                  <button
+                    onClick={() => {
+                      onOpenTrabajos();
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl flex items-center gap-2.5 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
+                  >
+                    <Building2 className="w-4 h-4 text-emerald-400" />
+                    <span className="font-medium">Lugares de Trabajo</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => {

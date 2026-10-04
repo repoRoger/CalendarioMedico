@@ -19,6 +19,8 @@ import {
 import { Header } from './components/Header';
 import { AppBottomNav, MainAppSection } from './components/AppBottomNav';
 import { ProximosView } from './components/ProximosView';
+import { WorkplacesListView } from './components/WorkplacesListView';
+import { WorkplaceModal } from './components/WorkplaceModal';
 import { CalendarMonthView } from './components/CalendarMonthView';
 import { CalendarWeekView } from './components/CalendarWeekView';
 import { ShiftListView } from './components/ShiftListView';
@@ -57,6 +59,10 @@ export default function App() {
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
+  // Workplace Modal State (Opens ONLY when creating or editing a workplace)
+  const [isWorkplaceModalOpen, setIsWorkplaceModalOpen] = useState(false);
+  const [editingHospital, setEditingHospital] = useState<Hospital | null>(null);
+
   // LED Notifications
   const [notifications, setNotifications] = useState<LedMessage[]>([]);
 
@@ -91,11 +97,6 @@ export default function App() {
   };
 
   const handleSelectSection = (section: MainAppSection) => {
-    if (section === 'trabajos') {
-      setSettingsInitialTab('hospitals');
-      setIsSettingsModalOpen(true);
-      return;
-    }
     if (section === 'perfil') {
       setIsProfileModalOpen(true);
       return;
@@ -105,7 +106,21 @@ export default function App() {
       setIsSettingsModalOpen(true);
       return;
     }
+    // 'trabajos', 'calendario', 'proximos' navigate smoothly to that full screen view!
     setActiveSection(section);
+  };
+
+  const handleSaveHospitalFromModal = (savedHosp: Hospital) => {
+    let updated: Hospital[];
+    const exists = hospitals.some((h) => h.id === savedHosp.id);
+    if (exists) {
+      updated = hospitals.map((h) => (h.id === savedHosp.id ? savedHosp : h));
+      addNotification('success', 'Lugar actualizado', `Se guardó ${savedHosp.shortName}`);
+    } else {
+      updated = [...hospitals, savedHosp];
+      addNotification('success', 'Lugar creado', `Se agregó ${savedHosp.shortName}`);
+    }
+    handleSaveHospitals(updated);
   };
 
   // Login handler
@@ -323,7 +338,8 @@ export default function App() {
           setActiveSection('calendario');
         }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
-        onOpenSettings={(tab = 'hospitals') => {
+        onOpenTrabajos={() => setActiveSection('trabajos')}
+        onOpenSettings={(tab = 'templates') => {
           setSettingsInitialTab(tab);
           setIsSettingsModalOpen(true);
         }}
@@ -342,9 +358,27 @@ export default function App() {
             user={user}
             onEditDay={(dateIso) => setSelectedDateForModal(dateIso)}
             onGoToCalendar={() => setActiveSection('calendario')}
-            onOpenWorkplaces={() => {
-              setSettingsInitialTab('hospitals');
-              setIsSettingsModalOpen(true);
+            onOpenWorkplaces={() => setActiveSection('trabajos')}
+          />
+        )}
+
+        {/* VIEW 2: TRABAJOS (Listado visual de centros sin popup) */}
+        {activeSection === 'trabajos' && (
+          <WorkplacesListView
+            hospitals={hospitals}
+            shifts={shifts}
+            onOpenCreate={() => {
+              setEditingHospital(null);
+              setIsWorkplaceModalOpen(true);
+            }}
+            onOpenEdit={(hosp) => {
+              setEditingHospital(hosp);
+              setIsWorkplaceModalOpen(true);
+            }}
+            onDeleteHospital={(hospId) => {
+              const updated = hospitals.filter((h) => h.id !== hospId);
+              handleSaveHospitals(updated);
+              addNotification('info', 'Lugar eliminado', 'Se quitó el centro de trabajo.');
             }}
           />
         )}
@@ -381,8 +415,8 @@ export default function App() {
                   </div>
                   <button
                     onClick={() => {
-                      setSettingsInitialTab('hospitals');
-                      setIsSettingsModalOpen(true);
+                      setEditingHospital(null);
+                      setIsWorkplaceModalOpen(true);
                     }}
                     className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-900/30 flex items-center gap-1.5 shrink-0"
                   >
@@ -437,11 +471,11 @@ export default function App() {
                     );
                   })}
 
-                  {/* Quick link to manage hospitals */}
+                  {/* Quick link to create workplace */}
                   <button
                     onClick={() => {
-                      setSettingsInitialTab('hospitals');
-                      setIsSettingsModalOpen(true);
+                      setEditingHospital(null);
+                      setIsWorkplaceModalOpen(true);
                     }}
                     className="text-xs text-slate-400 hover:text-teal-300 px-2.5 py-1.5 rounded-xl border border-dashed border-slate-700 hover:border-teal-500/50 min-h-[40px] flex items-center gap-1 transition-colors"
                   >
@@ -501,9 +535,22 @@ export default function App() {
           onClose={() => setSelectedDateForModal(null)}
           onSaveDayShifts={handleSaveDayShifts}
           onOpenHospitalManager={() => {
-            setSettingsInitialTab('hospitals');
-            setIsSettingsModalOpen(true);
+            setEditingHospital(null);
+            setIsWorkplaceModalOpen(true);
           }}
+        />
+      )}
+
+      {/* POPUP: Workplace Modal (Opens ONLY when creating or editing a workplace) */}
+      {isWorkplaceModalOpen && (
+        <WorkplaceModal
+          isOpen={isWorkplaceModalOpen}
+          hospital={editingHospital}
+          onClose={() => {
+            setIsWorkplaceModalOpen(false);
+            setEditingHospital(null);
+          }}
+          onSave={handleSaveHospitalFromModal}
         />
       )}
 
