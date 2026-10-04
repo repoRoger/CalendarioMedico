@@ -68,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div className="flex items-center gap-1">
               <span className="text-base font-extrabold tracking-tight text-white group-hover:text-teal-300 transition-colors">
-                Calendario<span className="text-teal-400">Medico</span>
+                Calendario
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-200 transition-transform" />
             </div>

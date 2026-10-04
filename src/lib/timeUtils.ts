@@ -39,6 +39,33 @@ export function calculateShiftHours(start: string, end: string): number {
   return Math.round(hours * 10) / 10;
 }
 
+/**
+ * Returns current Date object in Honduras time (America/Tegucigalpa, UTC-6).
+ * Ensures "Hoy" and "Mañana" and shift calculations strictly match local Honduras time,
+ * preventing UTC from jumping ahead by 6 hours.
+ */
+export function getHondurasDate(): Date {
+  const now = new Date();
+  try {
+    const hnString = now.toLocaleString('en-US', { timeZone: 'America/Tegucigalpa' });
+    return new Date(hnString);
+  } catch {
+    const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+    const hnMs = utcMs - 6 * 3600000;
+    return new Date(hnMs);
+  }
+}
+
+export function getHondurasTodayIso(): string {
+  return formatDateToIso(getHondurasDate());
+}
+
+export function getHondurasTomorrowIso(): string {
+  const d = getHondurasDate();
+  d.setDate(d.getDate() + 1);
+  return formatDateToIso(d);
+}
+
 export function formatDateToIso(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -72,7 +99,7 @@ export function getMonthMatrix(year: number, month: number): CalendarDayItem[] {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
 
-  const todayIso = formatDateToIso(new Date());
+  const todayIso = getHondurasTodayIso();
 
   // In standard calendar starting on Monday (or Sunday):
   // Let's start on Monday (European / Latin American standard for nursing rosters: Lunes a Domingo)

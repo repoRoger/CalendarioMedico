@@ -13,14 +13,15 @@ import {
   getStoredTursoConfig, saveStoredTursoConfig
 } from './lib/storage';
 import {
-  getMonthMatrix, getWeekDays, formatDateToIso, SPANISH_MONTHS
+  getMonthMatrix, getWeekDays, formatDateToIso, SPANISH_MONTHS,
+  getHondurasDate, getHondurasTodayIso, getHondurasTomorrowIso
 } from './lib/timeUtils';
 import { Header } from './components/Header';
-import { MobileBottomBar } from './components/MobileBottomBar';
+import { AppBottomNav, MainAppSection } from './components/AppBottomNav';
+import { ProximosView } from './components/ProximosView';
 import { CalendarMonthView } from './components/CalendarMonthView';
 import { CalendarWeekView } from './components/CalendarWeekView';
 import { ShiftListView } from './components/ShiftListView';
-import { UpcomingShiftsWidget } from './components/UpcomingShiftsWidget';
 import { DayEditModal } from './components/DayEditModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ProfileModal } from './components/ProfileModal';
@@ -34,8 +35,9 @@ import {
 } from './lib/tursoClient';
 
 export default function App() {
-  const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [currentDate, setCurrentDate] = useState(() => getHondurasDate());
   const [currentView, setCurrentView] = useState<'month' | 'week' | 'list'>('month');
+  const [activeSection, setActiveSection] = useState<MainAppSection>('proximos');
 
   // Core Data State
   const [hospitals, setHospitals] = useState<Hospital[]>(() => getStoredHospitals());
@@ -85,7 +87,25 @@ export default function App() {
   };
 
   const handleToday = () => {
-    setCurrentDate(new Date());
+    setCurrentDate(getHondurasDate());
+  };
+
+  const handleSelectSection = (section: MainAppSection) => {
+    if (section === 'trabajos') {
+      setSettingsInitialTab('hospitals');
+      setIsSettingsModalOpen(true);
+      return;
+    }
+    if (section === 'perfil') {
+      setIsProfileModalOpen(true);
+      return;
+    }
+    if (section === 'ajustes') {
+      setSettingsInitialTab('templates');
+      setIsSettingsModalOpen(true);
+      return;
+    }
+    setActiveSection(section);
   };
 
   // Login handler
@@ -286,10 +306,22 @@ export default function App() {
         currentView={currentView}
         user={user}
         hospitals={hospitals}
-        onViewChange={setCurrentView}
-        onPrevMonth={handlePrevMonth}
-        onNextMonth={handleNextMonth}
-        onToday={handleToday}
+        onViewChange={(v) => {
+          setCurrentView(v);
+          setActiveSection('calendario');
+        }}
+        onPrevMonth={() => {
+          handlePrevMonth();
+          setActiveSection('calendario');
+        }}
+        onNextMonth={() => {
+          handleNextMonth();
+          setActiveSection('calendario');
+        }}
+        onToday={() => {
+          handleToday();
+          setActiveSection('calendario');
+        }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         onOpenSettings={(tab = 'hospitals') => {
           setSettingsInitialTab(tab);
@@ -301,154 +333,161 @@ export default function App() {
       />
 
       {/* Main Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 space-y-3 sm:space-y-4">
-        {/* Hospital Filter WrapPanel (User request: "los wrappanel de centros en el calendario los usaría para filtrar los turnos") */}
-        <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-slate-300 flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-teal-400" />
-              <span>Filtrar por Centro Médico:</span>
-            </span>
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 pb-24">
+        {/* VIEW 1: PRÓXIMOS (Página principal por defecto al entrar) */}
+        {activeSection === 'proximos' && (
+          <ProximosView
+            shifts={shifts}
+            hospitals={hospitals}
+            user={user}
+            onEditDay={(dateIso) => setSelectedDateForModal(dateIso)}
+            onGoToCalendar={() => setActiveSection('calendario')}
+            onOpenWorkplaces={() => {
+              setSettingsInitialTab('hospitals');
+              setIsSettingsModalOpen(true);
+            }}
+          />
+        )}
 
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400 font-mono text-[11px]">
-                Mes: <strong className="text-teal-400">{monthTotalHours}h</strong>
-              </span>
-              {month24hDaysCount > 0 && (
-                <span className="text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded text-[10px]">
-                  ⚡ {month24hDaysCount} de 24h
+        {/* VIEW 2: CALENDARIO (Vista completa de mes) */}
+        {activeSection === 'calendario' && (
+          <div className="space-y-3 sm:space-y-4">
+            {/* Hospital Filter WrapPanel */}
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Filtrar por Centro Médico:</span>
                 </span>
-              )}
-            </div>
-          </div>
 
-          {/* Interactive Pills */}
-          {hospitals.length === 0 ? (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl bg-slate-950/60 border border-dashed border-slate-800">
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <Sparkles className="w-4 h-4 text-teal-400 shrink-0" />
-                <span>Comienza agregando tu primer lugar de trabajo o centro (hospital, fábrica, empresa, etc.):</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400 font-mono text-[11px]">
+                    Mes: <strong className="text-teal-400">{monthTotalHours}h</strong>
+                  </span>
+                  {month24hDaysCount > 0 && (
+                    <span className="text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded text-[10px]">
+                      ⚡ {month24hDaysCount} de 24h
+                    </span>
+                  )}
+                </div>
               </div>
-              <button
-                onClick={() => {
-                  setSettingsInitialTab('hospitals');
-                  setIsSettingsModalOpen(true);
-                }}
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-900/30 flex items-center gap-1.5 shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Agregar centro</span>
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* "Todos los centros" pill */}
-              <button
-                onClick={() => setHospitalFilter('all')}
-                className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 ${
-                  hospitalFilter === 'all'
-                    ? 'bg-teal-500 text-slate-950 font-bold shadow-md shadow-teal-500/20 ring-2 ring-teal-400'
-                    : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700'
-                }`}
-              >
-                <span>Todos los centros</span>
-                <span className="bg-black/20 px-1.5 py-0.2 rounded text-[10.5px] font-mono">
-                  {currentMonthShifts.length}
-                </span>
-              </button>
 
-              {/* Each hospital badge */}
-              {hospitals.map((hosp) => {
-                const isSelected = hospitalFilter === hosp.id;
-                const hospHours = currentMonthShifts
-                  .filter((s) => s.hospitalId === hosp.id)
-                  .reduce((acc, s) => acc + (s.hours || 0), 0);
-
-                return (
+              {/* Interactive Pills */}
+              {hospitals.length === 0 ? (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl bg-slate-950/60 border border-dashed border-slate-800">
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <Sparkles className="w-4 h-4 text-teal-400 shrink-0" />
+                    <span>Comienza agregando tu primer lugar de trabajo o centro (hospital, fábrica, empresa, etc.):</span>
+                  </div>
                   <button
-                    key={hosp.id}
-                    onClick={() => setHospitalFilter(isSelected ? 'all' : hosp.id)}
-                    className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold text-white flex items-center gap-2 transition-all active:scale-95 shadow-sm border ${
-                      isSelected
-                        ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105 border-white'
-                        : 'border-transparent opacity-85 hover:opacity-100 hover:scale-[1.02]'
-                    }`}
-                    style={{
-                      background: `linear-gradient(135deg, ${hosp.gradientStart}, ${hosp.gradientEnd})`,
+                    onClick={() => {
+                      setSettingsInitialTab('hospitals');
+                      setIsSettingsModalOpen(true);
                     }}
-                    title={isSelected ? 'Clic para mostrar todos' : `Filtrar solo turnos de ${hosp.name}`}
+                    className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-900/30 flex items-center gap-1.5 shrink-0"
                   >
-                    <Building2 className="w-3.5 h-3.5" />
-                    <span className="font-bold">{hosp.shortName}</span>
-                    <span className="bg-black/25 px-1.5 py-0.2 rounded text-[10.5px] font-mono">
-                      {hospHours}h
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Agregar centro</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* "Todos los centros" pill */}
+                  <button
+                    onClick={() => setHospitalFilter('all')}
+                    className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 ${
+                      hospitalFilter === 'all'
+                        ? 'bg-teal-500 text-slate-950 font-bold shadow-md shadow-teal-500/20 ring-2 ring-teal-400'
+                        : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700'
+                    }`}
+                  >
+                    <span>Todos los centros</span>
+                    <span className="bg-black/20 px-1.5 py-0.2 rounded text-[10.5px] font-mono">
+                      {currentMonthShifts.length}
                     </span>
                   </button>
-                );
-              })}
 
-              {/* Quick link to manage hospitals */}
-              <button
-                onClick={() => {
-                  setSettingsInitialTab('hospitals');
-                  setIsSettingsModalOpen(true);
-                }}
-                className="text-xs text-slate-400 hover:text-teal-300 px-2.5 py-1.5 rounded-xl border border-dashed border-slate-700 hover:border-teal-500/50 min-h-[40px] flex items-center gap-1 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Nuevo Centro</span>
-              </button>
+                  {/* Each hospital badge */}
+                  {hospitals.map((hosp) => {
+                    const isSelected = hospitalFilter === hosp.id;
+                    const hospHours = currentMonthShifts
+                      .filter((s) => s.hospitalId === hosp.id)
+                      .reduce((acc, s) => acc + (s.hours || 0), 0);
+
+                    return (
+                      <button
+                        key={hosp.id}
+                        onClick={() => setHospitalFilter(isSelected ? 'all' : hosp.id)}
+                        className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold text-white flex items-center gap-2 transition-all active:scale-95 shadow-sm border ${
+                          isSelected
+                            ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105 border-white'
+                            : 'border-transparent opacity-85 hover:opacity-100 hover:scale-[1.02]'
+                        }`}
+                        style={{
+                          background: `linear-gradient(135deg, ${hosp.gradientStart}, ${hosp.gradientEnd})`,
+                        }}
+                        title={isSelected ? 'Clic para mostrar todos' : `Filtrar solo turnos de ${hosp.name}`}
+                      >
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span className="font-bold">{hosp.shortName}</span>
+                        <span className="bg-black/25 px-1.5 py-0.2 rounded text-[10.5px] font-mono">
+                          {hospHours}h
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {/* Quick link to manage hospitals */}
+                  <button
+                    onClick={() => {
+                      setSettingsInitialTab('hospitals');
+                      setIsSettingsModalOpen(true);
+                    }}
+                    className="text-xs text-slate-400 hover:text-teal-300 px-2.5 py-1.5 rounded-xl border border-dashed border-slate-700 hover:border-teal-500/50 min-h-[40px] flex items-center gap-1 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Nuevo Centro</span>
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Upcoming Shifts: Hoy y Mañana (Vista rápida al entrar) */}
-        <UpcomingShiftsWidget
-          shifts={shifts}
-          hospitals={hospitals}
-          onSelectDate={(dateIso) => setSelectedDateForModal(dateIso)}
-        />
+            {/* Calendar Month View (Al darle clic a cualquier celda, se abre el modal para editar turnos) */}
+            {currentView === 'month' && (
+              <CalendarMonthView
+                days={monthDays}
+                shifts={shifts}
+                hospitals={hospitals}
+                filteredHospitalId={hospitalFilter}
+                onSelectDate={(date) => setSelectedDateForModal(date)}
+              />
+            )}
 
-        {/* View Component based on switcher */}
-        {currentView === 'month' && (
-          <CalendarMonthView
-            days={monthDays}
-            shifts={shifts}
-            hospitals={hospitals}
-            filteredHospitalId={hospitalFilter}
-            onSelectDate={(date) => setSelectedDateForModal(date)}
-          />
-        )}
+            {currentView === 'week' && (
+              <CalendarWeekView
+                days={weekDays}
+                shifts={shifts}
+                hospitals={hospitals}
+                filteredHospitalId={hospitalFilter}
+                onSelectDate={(date) => setSelectedDateForModal(date)}
+              />
+            )}
 
-        {currentView === 'week' && (
-          <CalendarWeekView
-            days={weekDays}
-            shifts={shifts}
-            hospitals={hospitals}
-            filteredHospitalId={hospitalFilter}
-            onSelectDate={(date) => setSelectedDateForModal(date)}
-          />
-        )}
-
-        {currentView === 'list' && (
-          <ShiftListView
-            shifts={hospitalFilter === 'all' ? shifts : shifts.filter((s) => s.hospitalId === hospitalFilter)}
-            hospitals={hospitals}
-            onSelectDate={(date) => setSelectedDateForModal(date)}
-          />
+            {currentView === 'list' && (
+              <ShiftListView
+                shifts={hospitalFilter === 'all' ? shifts : shifts.filter((s) => s.hospitalId === hospitalFilter)}
+                hospitals={hospitals}
+                onSelectDate={(date) => setSelectedDateForModal(date)}
+              />
+            )}
+          </div>
         )}
       </main>
 
-      {/* Fixed Mobile Bottom Navigation Bar (Thumb ergonomics) */}
-      <MobileBottomBar
-        currentView={currentView}
-        onViewChange={setCurrentView}
-        onOpenStats={() => setIsStatsModalOpen(true)}
-        onOpenSettings={() => {
-          setSettingsInitialTab('hospitals');
-          setIsSettingsModalOpen(true);
-        }}
-        onQuickAddToday={() => setSelectedDateForModal(formatDateToIso(new Date()))}
+      {/* Unified 5-Item Bottom Navigation Bar (Trabajos, Calendario, Próximos, Mi perfil, Ajustes) */}
+      <AppBottomNav
+        activeSection={activeSection}
+        onSelectSection={handleSelectSection}
       />
 
       {/* POPUP: Edit Day Shifts (Mobile-First Bottom Sheet) */}
