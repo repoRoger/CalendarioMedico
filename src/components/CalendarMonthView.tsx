@@ -1,6 +1,6 @@
 import React from 'react';
 import { Plus, Clock, Moon, Sparkles, Building2 } from 'lucide-react';
-import { CalendarDayItem, SPANISH_WEEKDAYS } from '../lib/timeUtils';
+import { CalendarDayItem, SPANISH_WEEKDAYS, getShiftDisplayCode, getShiftMobileLabel } from '../lib/timeUtils';
 import { MedicalShift, Hospital } from '../types';
 import { getHospitalForShift } from '../lib/storage';
 
@@ -125,6 +125,10 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                   const gradStart = hosp?.gradientStart || '#0d9488';
                   const gradEnd = hosp?.gradientEnd || '#059669';
 
+                  const displayCode = getShiftDisplayCode(shift.shiftCode);
+                  const hospName = hosp?.shortName || hosp?.name || 'Centro';
+                  const mobileLabel = getShiftMobileLabel(hospName, shift.shiftCode);
+
                   return (
                     <div
                       key={shift.id || idx}
@@ -135,10 +139,16 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                       title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${shift.hours}h${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                     >
                       <div className="flex items-center gap-1 min-w-0">
-                        <span className="font-bold font-mono text-[10px] bg-black/25 px-1 rounded shrink-0">
-                          {shift.shiftCode}
+                        {/* On mobile: 4 letters of workplace + shift code (e.g. "Bend TA") */}
+                        <span className="sm:hidden font-bold font-mono text-[9px] tracking-tight truncate">
+                          {mobileLabel}
                         </span>
-                        <span className="truncate font-medium text-[10.5px]">
+
+                        {/* On tablet/desktop: badge with code and workplace full shortName */}
+                        <span className="hidden sm:inline-block font-bold font-mono text-[10px] bg-black/25 px-1 rounded shrink-0">
+                          {displayCode}
+                        </span>
+                        <span className="hidden sm:inline-block truncate font-medium text-[10.5px]">
                           {hosp?.shortName || hosp?.name || shift.title}
                         </span>
                       </div>
@@ -152,7 +162,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                             📝
                           </span>
                         )}
-                        <span className="font-mono text-[9.5px] opacity-90">
+                        <span className="font-mono text-[9px] sm:text-[9.5px] opacity-90">
                           {shift.startTime.slice(0, 5)}
                         </span>
                       </div>

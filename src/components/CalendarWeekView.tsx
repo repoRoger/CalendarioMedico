@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Plus, Clock, Moon, ShieldAlert, Building2, ChevronLeft, ChevronRight, Calendar
 } from 'lucide-react';
-import { CalendarDayItem, SPANISH_WEEKDAYS, formatFriendlyDate, SPANISH_MONTHS } from '../lib/timeUtils';
+import { CalendarDayItem, SPANISH_WEEKDAYS, formatFriendlyDate, SPANISH_MONTHS, getShiftDisplayCode } from '../lib/timeUtils';
 import { MedicalShift, Hospital } from '../types';
 import { getHospitalForShift } from '../lib/storage';
 
@@ -174,8 +174,8 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                       >
                         <div className="flex items-center justify-between gap-1 font-bold">
                           <span className="truncate">{hosp?.shortName || hosp?.name || 'Centro'}</span>
-                          <span className="bg-black/25 px-1 py-0.2 rounded font-mono text-[10px]">
-                            {shift.shiftCode}
+                          <span className="bg-black/25 px-1.5 py-0.5 rounded font-mono text-[10px]">
+                            {getShiftDisplayCode(shift.shiftCode)}
                           </span>
                         </div>
 

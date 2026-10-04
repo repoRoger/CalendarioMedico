@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Copy, Check, Printer, Share2, Calendar } from 'lucide-react';
 import { MedicalShift, Hospital, UserSession } from '../types';
-import { SPANISH_MONTHS, formatFriendlyDate } from '../lib/timeUtils';
+import { SPANISH_MONTHS, formatFriendlyDate, getShiftDisplayCode } from '../lib/timeUtils';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -54,7 +54,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       const shiftDesc = dayShifts
         .map((s) => {
           const hosp = hospitals.find((h) => h.id === s.hospitalId)?.shortName || 'Hosp';
-          return `[${s.shiftCode}] ${hosp} (${s.startTime}-${s.endTime}, ${s.hours}h)`;
+          return `[${getShiftDisplayCode(s.shiftCode)}] ${hosp} (${s.startTime}-${s.endTime}, ${s.hours}h)`;
         })
         .join(' + ');
 

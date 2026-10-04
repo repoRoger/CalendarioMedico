@@ -6,7 +6,7 @@ import {
   ArrowLeft, ChevronRight
 } from 'lucide-react';
 import { Hospital, MedicalShift, ShiftCode, ShiftTemplate } from '../types';
-import { calculateShiftHours, formatFriendlyDate } from '../lib/timeUtils';
+import { calculateShiftHours, formatFriendlyDate, getShiftDisplayCode, getShiftDisplayName } from '../lib/timeUtils';
 import { getHospitalForShift } from '../lib/storage';
 
 interface DayEditModalProps {
@@ -80,7 +80,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
   };
 
   // Start creating a brand new shift
-  const handleOpenNewShift = (preferredCode: ShiftCode = 'M') => {
+  const handleOpenNewShift = (preferredCode: ShiftCode = 'TA') => {
     const tpl = templates.find((t) => t.code === preferredCode) || templates[0];
     const isCubrir = preferredCode === 'C';
     const startTime = tpl?.defaultStartTime || '07:00';
@@ -91,8 +91,8 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
       id: `shift-${date}-${Date.now()}-${shifts.length + 1}`,
       date,
       hospitalId: defaultHospitalId,
-      shiftCode: isCubrir ? 'C' : (tpl?.code || 'M'),
-      title: isCubrir ? 'Cubrir' : (tpl?.name || 'Turno'),
+      shiftCode: isCubrir ? 'C' : (tpl?.code || 'TA'),
+      title: isCubrir ? 'Cubrir' : (tpl?.name || 'TA'),
       startTime,
       endTime,
       hours: calculated,
@@ -361,7 +361,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                                 </span>
 
                                 <span className="px-2 py-0.5 rounded-md bg-slate-800 text-teal-300 text-xs font-mono font-bold">
-                                  {shift.shiftCode}: {shift.title}
+                                  {getShiftDisplayCode(shift.shiftCode)}: {getShiftDisplayName(shift.title || shift.shiftCode)}
                                 </span>
 
                                 {!isLibre && (
@@ -414,7 +414,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                 <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
                   <button
                     type="button"
-                    onClick={() => handleOpenNewShift('M')}
+                    onClick={() => handleOpenNewShift('TA')}
                     className="flex-1 py-3 px-4 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-teal-900/30 transition-all active:scale-[0.98] min-h-[44px]"
                   >
                     <Plus className="w-4 h-4" />

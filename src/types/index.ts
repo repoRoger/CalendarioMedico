@@ -13,7 +13,7 @@ export interface Hospital {
   isCustom?: boolean;
 }
 
-export type ShiftCode = 'M' | 'T' | 'N' | '24H' | 'D' | 'C' | 'E' | 'L' | 'CUSTOM';
+export type ShiftCode = 'TA' | 'TB' | 'TC' | 'M' | 'T' | 'N' | '24H' | 'D' | 'C' | 'E' | 'L' | 'CUSTOM';
 
 export interface ShiftTemplate {
   id: string;

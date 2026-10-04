@@ -105,7 +105,7 @@ export async function initializeTursoTables(client: Client): Promise<void> {
     )
   `);
 
-  // Table: usuarios (guarda datos de perfil y foto_blob directamente en Turso sin R2)
+  // Table: usuarios (guarda datos de perfil, contraseña y foto_blob directamente en Turso sin R2)
   await client.execute(`
     CREATE TABLE IF NOT EXISTS usuarios (
       cliente_correo TEXT PRIMARY KEY,
@@ -116,9 +116,19 @@ export async function initializeTursoTables(client: Client): Promise<void> {
       especialidad TEXT,
       telefono TEXT,
       foto_blob TEXT,
+      password_hash TEXT,
+      creado_con_google INTEGER DEFAULT 0,
       actualizado_en TEXT
     )
   `);
+
+  // Migrations for existing database
+  try {
+    await client.execute(`ALTER TABLE usuarios ADD COLUMN password_hash TEXT`);
+  } catch {}
+  try {
+    await client.execute(`ALTER TABLE usuarios ADD COLUMN creado_con_google INTEGER DEFAULT 0`);
+  } catch {}
 }
 
 /**
@@ -470,4 +480,154 @@ export async function fetchUserProfileFromTurso(client: Client, email: string): 
     return null;
   }
 }
+
+/**
+ * SHA-256 password hash using standard Web Crypto API
+ */
+export async function hashPassword(password: string): Promise<string> {
+  const enc = new TextEncoder();
+  const data = enc.encode(`salt_calendariomedico_2026_${password}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export interface AuthResult {
+  success: boolean;
+  message?: string;
+  user?: Partial<UserSession>;
+}
+
+/**
+ * Registers a new user with email and password in Turso.
+ */
+export async function registerUserWithPassword(
+  client: Client,
+  email: string,
+  password: string,
+  fullName: string
+): Promise<AuthResult> {
+  try {
+    await initializeTursoTables(client);
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check if user already exists
+    const existing = await client.execute({
+      sql: `SELECT cliente_correo, password_hash, creado_con_google FROM usuarios WHERE cliente_correo = ?`,
+      args: [cleanEmail],
+    });
+
+    if (existing.rows.length > 0) {
+      const row = existing.rows[0];
+      if (row.password_hash) {
+        return {
+          success: false,
+          message: 'Este correo ya tiene una cuenta registrada. Inicia sesión con tu contraseña.',
+        };
+      } else if (Number(row.creado_con_google) === 1) {
+        return {
+          success: false,
+          message: 'Este correo fue registrado previamente con Google. Inicia sesión con Google.',
+        };
+      }
+    }
+
+    const hashedPassword = await hashPassword(password);
+    const now = new Date().toISOString();
+
+    await client.execute({
+      sql: `
+        INSERT INTO usuarios (cliente_correo, nombre_personal, nombre_completo, password_hash, creado_con_google, actualizado_en)
+        VALUES (?, ?, ?, ?, 0, ?)
+        ON CONFLICT(cliente_correo) DO UPDATE SET
+          password_hash = excluded.password_hash,
+          nombre_completo = excluded.nombre_completo,
+          actualizado_en = excluded.actualizado_en
+      `,
+      args: [cleanEmail, fullName, fullName, hashedPassword, now],
+    });
+
+    return {
+      success: true,
+      user: {
+        email: cleanEmail,
+        personalName: fullName,
+        name: fullName,
+        titlePrefix: '',
+        role: 'Personal de Salud',
+      },
+    };
+  } catch (err: any) {
+    console.error('Error registrando usuario en Turso:', err);
+    return {
+      success: false,
+      message: err.message || 'Error al conectar con la base de datos Turso.',
+    };
+  }
+}
+
+/**
+ * Authenticates an existing user with email and password from Turso.
+ */
+export async function loginUserWithPassword(
+  client: Client,
+  email: string,
+  password: string
+): Promise<AuthResult> {
+  try {
+    await initializeTursoTables(client);
+    const cleanEmail = email.trim().toLowerCase();
+
+    const res = await client.execute({
+      sql: `SELECT * FROM usuarios WHERE cliente_correo = ?`,
+      args: [cleanEmail],
+    });
+
+    if (res.rows.length === 0) {
+      return {
+        success: false,
+        message: 'No existe ninguna cuenta registrada con este correo. Puedes crear tu cuenta en la pestaña "Crear Cuenta".',
+      };
+    }
+
+    const row = res.rows[0];
+    const storedHash = row.password_hash ? String(row.password_hash) : null;
+
+    if (!storedHash) {
+      return {
+        success: false,
+        message: 'Esta cuenta fue creada originalmente con Google. Por favor inicia sesión con el botón de Google.',
+      };
+    }
+
+    const computedHash = await hashPassword(password);
+    if (computedHash !== storedHash) {
+      return {
+        success: false,
+        message: 'Contraseña incorrecta. Por favor verifica tus datos.',
+      };
+    }
+
+    return {
+      success: true,
+      user: {
+        email: cleanEmail,
+        titlePrefix: String(row.titulo_prefijo || ''),
+        personalName: String(row.nombre_personal || ''),
+        name: String(row.nombre_completo || cleanEmail.split('@')[0]),
+        role: String(row.rol || 'Enfermería'),
+        specialty: String(row.especialidad || ''),
+        phone: String(row.telefono || ''),
+        photoBlob: row.foto_blob ? String(row.foto_blob) : undefined,
+      },
+    };
+  } catch (err: any) {
+    console.error('Error iniciando sesión en Turso:', err);
+    return {
+      success: false,
+      message: err.message || 'Error de conexión con Turso.',
+    };
+  }
+}
+
 

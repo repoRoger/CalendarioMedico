@@ -12,9 +12,9 @@ interface TemplateModalProps {
 }
 
 const TEMPLATE_CODES: { code: ShiftCode; label: string; color: string }[] = [
-  { code: 'M', label: 'M · Mañana', color: 'from-teal-600 to-emerald-500' },
-  { code: 'T', label: 'T · Tarde', color: 'from-orange-600 to-amber-500' },
-  { code: 'N', label: 'N · Noche', color: 'from-indigo-600 to-purple-600' },
+  { code: 'TA', label: 'TA · Mañana (07-15)', color: 'from-teal-600 to-emerald-500' },
+  { code: 'TB', label: 'TB · Tarde (15-23)', color: 'from-orange-600 to-amber-500' },
+  { code: 'TC', label: 'TC · Noche (23-07)', color: 'from-indigo-600 to-purple-600' },
   { code: '24H', label: '24H · Guardia 24H', color: 'from-rose-600 to-red-600' },
   { code: 'C', label: 'C · Cubrir', color: 'from-amber-600 to-yellow-600' },
   { code: 'D', label: 'D · Doble', color: 'from-cyan-600 to-blue-600' },
@@ -29,7 +29,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
 }) => {
   const isEditing = Boolean(template);
 
-  const [code, setCode] = useState<ShiftCode>('M');
+  const [code, setCode] = useState<ShiftCode>('TA');
   const [name, setName] = useState('');
   const [startTime, setStartTime] = useState('07:00');
   const [endTime, setEndTime] = useState('15:00');
@@ -45,12 +45,12 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
       setHours(template.defaultHours);
       setDescription(template.description || '');
     } else {
-      setCode('M');
-      setName('Turno Mañana');
+      setCode('TA');
+      setName('TA');
       setStartTime('07:00');
       setEndTime('15:00');
       setHours(8);
-      setDescription('Horario diurno estándar');
+      setDescription('Turno TA (07:00 - 15:00)');
     }
   }, [template, isOpen]);
 

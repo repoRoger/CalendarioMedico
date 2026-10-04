@@ -30,7 +30,13 @@ export const ShiftListView: React.FC<ShiftListViewProps> = ({
   const filtered = shifts
     .filter((s) => s.shiftCode !== 'L')
     .filter((s) => (filterHospital === 'all' ? true : s.hospitalId === filterHospital))
-    .filter((s) => (filterType === 'all' ? true : s.shiftCode === filterType))
+    .filter((s) => {
+      if (filterType === 'all') return true;
+      if (filterType === 'TA') return s.shiftCode === 'TA' || s.shiftCode === 'M';
+      if (filterType === 'TB') return s.shiftCode === 'TB' || s.shiftCode === 'T';
+      if (filterType === 'TC') return s.shiftCode === 'TC' || s.shiftCode === 'N';
+      return s.shiftCode === filterType;
+    })
     .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
 
   // Group shifts by date
@@ -48,15 +54,18 @@ export const ShiftListView: React.FC<ShiftListViewProps> = ({
     switch (shift.shiftCode) {
       case '24H':
         return <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-lg text-xs font-bold">Guardia 24H</span>;
+      case 'TC':
       case 'N':
-        return <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1"><Moon className="w-3 h-3" /> Noche</span>;
+        return <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1"><Moon className="w-3 h-3" /> TC</span>;
+      case 'TB':
       case 'T':
-        return <span className="bg-orange-500/20 text-orange-300 border border-orange-500/30 px-2 py-0.5 rounded-lg text-xs font-bold">Tarde</span>;
+        return <span className="bg-orange-500/20 text-orange-300 border border-orange-500/30 px-2 py-0.5 rounded-lg text-xs font-bold">TB</span>;
       case 'C':
         return <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1"><UserCheck className="w-3 h-3" /> Cubrir</span>;
+      case 'TA':
       case 'M':
       default:
-        return <span className="bg-teal-500/20 text-teal-300 border border-teal-500/30 px-2 py-0.5 rounded-lg text-xs font-bold">Mañana</span>;
+        return <span className="bg-teal-500/20 text-teal-300 border border-teal-500/30 px-2 py-0.5 rounded-lg text-xs font-bold">TA</span>;
     }
   };
 
@@ -87,9 +96,9 @@ export const ShiftListView: React.FC<ShiftListViewProps> = ({
             className="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500 min-h-[36px]"
           >
             <option value="all">Todos los Tipos</option>
-            <option value="M">Mañana (M)</option>
-            <option value="T">Tarde (T)</option>
-            <option value="N">Noche (N)</option>
+            <option value="TA">TA (07:00 - 15:00)</option>
+            <option value="TB">TB (15:00 - 23:00)</option>
+            <option value="TC">TC (23:00 - 07:00)</option>
             <option value="24H">Guardia 24H</option>
             <option value="C">Cubrir Turno (C)</option>
           </select>

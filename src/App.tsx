@@ -37,7 +37,8 @@ import { LedNotification, LedMessage } from './components/LedNotification';
 import {
   getTursoClient, syncLocalDataToTurso, saveUserProfileToTurso,
   fetchUserProfileFromTurso, fetchShiftsFromTurso, fetchHospitalsFromTurso,
-  mergeShifts, mergeHospitals, deleteHospitalFromTurso
+  mergeShifts, mergeHospitals, deleteHospitalFromTurso,
+  loginUserWithPassword, registerUserWithPassword
 } from './lib/tursoClient';
 import { generateSampleShifts, DEFAULT_HOSPITALS } from './lib/storage';
 
@@ -259,8 +260,8 @@ export default function App() {
     handleSaveTemplates(updated);
   };
 
-  // Login handler
-  const handleLogin = async (email: string, personalName?: string, photoUrl?: string) => {
+  // Google Login handler
+  const handleLoginGoogle = async (email: string, personalName?: string, photoUrl?: string) => {
     const cleanEmail = email.trim().toLowerCase();
     setIsSyncingCloud(true);
 
@@ -304,10 +305,23 @@ export default function App() {
             phone: remoteProfile.phone || activeUser.phone,
             photoBlob: remoteProfile.photoBlob || photoUrl || activeUser.photoBlob,
           };
+        } else {
+          // Register new Google user in Turso
+          await client.execute({
+            sql: `
+              INSERT INTO usuarios (cliente_correo, nombre_personal, nombre_completo, foto_blob, creado_con_google, actualizado_en)
+              VALUES (?, ?, ?, ?, 1, ?)
+              ON CONFLICT(cliente_correo) DO UPDATE SET
+                creado_con_google = 1,
+                actualizado_en = excluded.actualizado_en
+            `,
+            args: [cleanEmail, activeUser.personalName, activeUser.name, photoUrl || null, new Date().toISOString()],
+          });
         }
 
+        // New users start with 0 hospitals (not forced 3!)
         const finalShifts = remoteShifts || [];
-        const finalHospitals = (remoteHospitals && remoteHospitals.length > 0) ? remoteHospitals : DEFAULT_HOSPITALS;
+        const finalHospitals = (remoteHospitals && remoteHospitals.length > 0) ? remoteHospitals : [];
 
         setShifts(finalShifts);
         saveStoredShifts(finalShifts);
@@ -315,7 +329,7 @@ export default function App() {
         setHospitals(finalHospitals);
         saveStoredHospitals(finalHospitals);
 
-        addNotification('success', 'Sesión iniciada', `Bienvenido/a, ${activeUser.name} (${finalShifts.length} turnos cargados).`);
+        addNotification('success', 'Sesión iniciada con Google', `Bienvenido/a, ${activeUser.name}`);
       } catch (err: any) {
         console.error('Error cargando datos de Turso:', err);
         addNotification('warning', 'Aviso de conexión', 'No se pudieron descargar turnos de Turso');
@@ -329,6 +343,119 @@ export default function App() {
 
     setUser(activeUser);
     saveStoredUser(activeUser);
+  };
+
+  // Password Login Handler
+  const handleLoginWithPassword = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!tursoConfig.databaseUrl || !tursoConfig.authToken) {
+      return { success: false, message: 'La base de datos Turso no está configurada.' };
+    }
+
+    try {
+      const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+      const authRes = await loginUserWithPassword(client, cleanEmail, password);
+      if (!authRes.success || !authRes.user) {
+        return { success: false, message: authRes.message || 'Error al autenticar.' };
+      }
+
+      setIsSyncingCloud(true);
+      setShifts([]);
+      setHospitals([]);
+
+      const [remoteShifts, remoteHospitals] = await Promise.all([
+        fetchShiftsFromTurso(client, cleanEmail),
+        fetchHospitalsFromTurso(client, cleanEmail),
+      ]);
+
+      const activeUser: UserSession = {
+        id: `usr-${Date.now()}`,
+        email: cleanEmail,
+        titlePrefix: authRes.user.titlePrefix || '',
+        personalName: authRes.user.personalName || cleanEmail.split('@')[0],
+        name: authRes.user.name || cleanEmail.split('@')[0],
+        role: authRes.user.role || '',
+        specialty: authRes.user.specialty || '',
+        phone: authRes.user.phone || '',
+        photoBlob: authRes.user.photoBlob || '',
+        isLoggedIn: true,
+        isGoogleAuth: false,
+      };
+
+      const finalShifts = remoteShifts || [];
+      const finalHospitals = (remoteHospitals && remoteHospitals.length > 0) ? remoteHospitals : [];
+
+      setShifts(finalShifts);
+      saveStoredShifts(finalShifts);
+
+      setHospitals(finalHospitals);
+      saveStoredHospitals(finalHospitals);
+
+      setUser(activeUser);
+      saveStoredUser(activeUser);
+
+      addNotification('success', 'Sesión iniciada', `Bienvenido/a, ${activeUser.name}`);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Error al conectar con Turso.' };
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
+
+  // Register with Password Handler
+  const handleRegisterWithPassword = async (email: string, password: string, name: string): Promise<{ success: boolean; message?: string }> => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!tursoConfig.databaseUrl || !tursoConfig.authToken) {
+      return { success: false, message: 'La base de datos Turso no está configurada.' };
+    }
+
+    try {
+      const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+      const authRes = await registerUserWithPassword(client, cleanEmail, password, name);
+      if (!authRes.success || !authRes.user) {
+        return { success: false, message: authRes.message || 'Error al crear la cuenta.' };
+      }
+
+      // Brand new user starts with 0 shifts and 0 hospitals
+      setShifts([]);
+      saveStoredShifts([]);
+      setHospitals([]);
+      saveStoredHospitals([]);
+
+      const activeUser: UserSession = {
+        id: `usr-${Date.now()}`,
+        email: cleanEmail,
+        titlePrefix: '',
+        personalName: name,
+        name: name,
+        role: 'Personal de Salud',
+        specialty: '',
+        phone: '',
+        photoBlob: '',
+        isLoggedIn: true,
+        isGoogleAuth: false,
+      };
+
+      setUser(activeUser);
+      saveStoredUser(activeUser);
+
+      addNotification('success', '¡Cuenta creada!', `Bienvenido/a al Calendario Médico, ${name}`);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Error al registrarse en Turso.' };
+    }
+  };
+
+  // Optional: load reference hospitals for users with 0 hospitals
+  const handleLoadDefaultHospitals = async () => {
+    setHospitals(DEFAULT_HOSPITALS);
+    saveStoredHospitals(DEFAULT_HOSPITALS);
+    if (user.email && tursoConfig.databaseUrl && tursoConfig.authToken) {
+      const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+      await syncLocalDataToTurso(client, user.email, shifts, DEFAULT_HOSPITALS, templates);
+    }
+    addNotification('success', 'Centros sugeridos cargados', 'Se agregaron Bendaña, Catarino y CEMESA a tu cuenta.');
   };
 
   // Logout handler
@@ -352,7 +479,7 @@ export default function App() {
     saveStoredShifts([]);
     setHospitals([]);
     saveStoredHospitals([]);
-    addNotification('info', 'Sesión cerrada', 'Ingresa con tu correo para ver tus turnos.');
+    addNotification('info', 'Sesión cerrada', 'Ingresa con tu correo de Google o contraseña para ver tus turnos.');
   };
 
   // Save profile ("Mis datos") handler
@@ -548,6 +675,7 @@ export default function App() {
               handleSaveHospitals(updated, hospId);
               addNotification('info', 'Lugar eliminado', 'Se quitó el centro de trabajo.');
             }}
+            onLoadDefaultHospitals={handleLoadDefaultHospitals}
           />
         )}
 
@@ -867,8 +995,9 @@ export default function App() {
       {!user.isLoggedIn && (
         <LoginModal
           isOpen={!user.isLoggedIn}
-          currentUser={user}
-          onLogin={handleLogin}
+          onLoginGoogle={handleLoginGoogle}
+          onLoginWithPassword={handleLoginWithPassword}
+          onRegisterWithPassword={handleRegisterWithPassword}
         />
       )}
 

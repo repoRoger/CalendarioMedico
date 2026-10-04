@@ -180,3 +180,57 @@ export function getWeekDays(currentDate: Date): CalendarDayItem[] {
 
   return days;
 }
+
+/**
+ * Maps shift codes to modern standard:
+ * Mañana -> TA
+ * Tarde -> TB
+ * Noche -> TC
+ */
+export function getShiftDisplayCode(code: string): string {
+  switch (code) {
+    case 'M':
+    case 'TA':
+      return 'TA';
+    case 'T':
+    case 'TB':
+      return 'TB';
+    case 'N':
+    case 'TC':
+      return 'TC';
+    case '24H':
+      return '24H';
+    case 'D':
+      return 'D';
+    case 'C':
+      return 'C';
+    case 'L':
+      return 'L';
+    default:
+      return code || 'TA';
+  }
+}
+
+export function getShiftDisplayName(codeOrTitle: string): string {
+  const normalized = (codeOrTitle || '').trim();
+  const upper = normalized.toUpperCase();
+  if (upper === 'M' || upper === 'TA' || normalized.toLowerCase() === 'mañana') return 'TA';
+  if (upper === 'T' || upper === 'TB' || normalized.toLowerCase() === 'tarde') return 'TB';
+  if (upper === 'N' || upper === 'TC' || normalized.toLowerCase() === 'noche') return 'TC';
+  if (upper === '24H' || normalized.toLowerCase().includes('guardia 24')) return 'Guardia 24H';
+  if (upper === 'L' || normalized.toLowerCase() === 'libre') return 'Libre';
+  if (upper === 'C' || normalized.toLowerCase() === 'cubrir') return 'Cubrir';
+  return normalized;
+}
+
+/**
+ * Returns the 4-letter workplace abbreviation + shift code for mobile calendar cells
+ * Example: 'Bendaña' + 'TA' => 'Bend TA'
+ * 'Catarino' + 'TB' => 'Cata TB'
+ */
+export function getShiftMobileLabel(workplaceName: string, shiftCode: string): string {
+  const cleanName = (workplaceName || 'Hosp').trim();
+  const short4 = cleanName.slice(0, 4);
+  const code = getShiftDisplayCode(shiftCode);
+  return `${short4} ${code}`;
+}

@@ -30,7 +30,7 @@ export const StatsSummaryModal: React.FC<StatsSummaryModalProps> = ({
 
   const totalHours = monthShifts.reduce((acc, s) => acc + (s.hours || 0), 0);
   const totalShiftsCount = monthShifts.length;
-  const nightShiftsCount = monthShifts.filter((s) => s.isNightShift || s.shiftCode === 'N').length;
+  const nightShiftsCount = monthShifts.filter((s) => s.isNightShift || s.shiftCode === 'TC' || s.shiftCode === 'N').length;
 
   // Group by date to detect days with >= 24h
   const dateMap: Record<string, number> = {};

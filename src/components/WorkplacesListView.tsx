@@ -12,6 +12,7 @@ interface WorkplacesListViewProps {
   onOpenCreate: () => void;
   onOpenEdit: (hospital: Hospital) => void;
   onDeleteHospital: (hospitalId: string) => void;
+  onLoadDefaultHospitals?: () => void;
 }
 
 const getBadgeIconComponent = (iconName?: string) => {
@@ -36,6 +37,7 @@ export const WorkplacesListView: React.FC<WorkplacesListViewProps> = ({
   onOpenCreate,
   onOpenEdit,
   onDeleteHospital,
+  onLoadDefaultHospitals,
 }) => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -88,13 +90,24 @@ export const WorkplacesListView: React.FC<WorkplacesListViewProps> = ({
               Agrega tu primer hospital o centro médico para poder asignar tus turnos en el calendario.
             </p>
           </div>
-          <button
-            onClick={onOpenCreate}
-            className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-900/30 inline-flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Crear primer lugar</span>
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+            <button
+              onClick={onOpenCreate}
+              className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-900/30 inline-flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Crear mi primer lugar</span>
+            </button>
+            {onLoadDefaultHospitals && (
+              <button
+                onClick={onLoadDefaultHospitals}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold border border-slate-700 transition-all inline-flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-teal-400" />
+                <span>Cargar sugeridos (Bendaña, Catarino, CEMESA)</span>
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3">

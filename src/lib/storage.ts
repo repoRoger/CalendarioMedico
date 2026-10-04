@@ -1,4 +1,4 @@
-import { Hospital, MedicalShift, ShiftTemplate, UserSession, TursoConfig } from '../types';
+import { Hospital, MedicalShift, ShiftTemplate, UserSession, TursoConfig, ShiftCode } from '../types';
 import { formatDateToIso, calculateShiftHours } from './timeUtils';
 
 const STORAGE_KEYS = {
@@ -50,35 +50,35 @@ export const DEFAULT_HOSPITALS: Hospital[] = [
 
 export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
   {
-    id: 'tpl-m',
-    code: 'M',
-    name: 'Mañana',
+    id: 'tpl-ta',
+    code: 'TA',
+    name: 'TA',
     defaultStartTime: '07:00',
     defaultEndTime: '15:00',
     defaultHours: 8,
-    description: 'Turno matutino estándar de enfermería',
+    description: 'Turno TA (07:00 - 15:00)',
     colorBadge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
     isNightShift: false,
   },
   {
-    id: 'tpl-t',
-    code: 'T',
-    name: 'Tarde',
+    id: 'tpl-tb',
+    code: 'TB',
+    name: 'TB',
     defaultStartTime: '15:00',
     defaultEndTime: '23:00',
     defaultHours: 8,
-    description: 'Turno vespertino continuo',
+    description: 'Turno TB (15:00 - 23:00)',
     colorBadge: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
     isNightShift: false,
   },
   {
-    id: 'tpl-n',
-    code: 'N',
-    name: 'Noche',
+    id: 'tpl-tc',
+    code: 'TC',
+    name: 'TC',
     defaultStartTime: '23:00',
     defaultEndTime: '07:00',
     defaultHours: 8,
-    description: 'Turno nocturno (cruza medianoche)',
+    description: 'Turno TC (23:00 - 07:00)',
     colorBadge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
     isNightShift: true,
   },
@@ -168,7 +168,7 @@ export function generateSampleShifts(): MedicalShift[] {
   const addShift = (
     day: number,
     hospId: string,
-    code: 'M' | 'T' | 'N' | '24H' | 'D' | 'E' | 'L',
+    code: ShiftCode,
     start: string,
     end: string,
     title: string,
@@ -189,20 +189,20 @@ export function generateSampleShifts(): MedicalShift[] {
       hours,
       department: dept,
       notes: notes || '',
-      isNightShift: code === 'N' || code === '24H',
+      isNightShift: code === 'TC' || code === 'N' || code === '24H',
     });
   };
 
-  // Day 2: Turno Mañana en Bendaña
-  addShift(2, 'hosp-bendana', 'M', '07:00', '15:00', 'Mañana', 'UCI Adultos');
+  // Day 2: Turno TA en Bendaña
+  addShift(2, 'hosp-bendana', 'TA', '07:00', '15:00', 'TA', 'UCI Adultos');
 
   // Day 3: TRIPLE TURNO (24 HORAS REALES TRABAJADAS - caso exacto de la amiga enfermera!)
-  // Turno 1: Mañana en Bendaña
-  addShift(3, 'hosp-bendana', 'M', '07:00', '15:00', 'Mañana (T1)', 'Emergencias', 'Rotación 1 de 3');
-  // Turno 2: Tarde en Catarino
-  addShift(3, 'hosp-catarino', 'T', '15:00', '23:00', 'Tarde (T2)', 'Cirugía Hombres', 'Continuo con Catarino');
-  // Turno 3: Noche en Catarino
-  addShift(3, 'hosp-catarino', 'N', '23:00', '07:00', 'Noche (T3)', 'Cirugía Hombres', 'Cierre de 24h continuas!');
+  // Turno 1: TA en Bendaña
+  addShift(3, 'hosp-bendana', 'TA', '07:00', '15:00', 'TA', 'Emergencias', 'Rotación 1 de 3');
+  // Turno 2: TB en Catarino
+  addShift(3, 'hosp-catarino', 'TB', '15:00', '23:00', 'TB', 'Cirugía Hombres', 'Continuo con Catarino');
+  // Turno 3: TC en Catarino
+  addShift(3, 'hosp-catarino', 'TC', '23:00', '07:00', 'TC', 'Cirugía Hombres', 'Cierre de 24h continuas!');
 
   // Day 4: Libre post-guardia
   addShift(4, 'hosp-bendana', 'L', '00:00', '00:00', 'Libre', 'Post-Guardia', 'Descanso merecido');
@@ -213,30 +213,30 @@ export function generateSampleShifts(): MedicalShift[] {
   // Day 7: Libre
   addShift(7, 'hosp-catarino', 'L', '00:00', '00:00', 'Libre', 'Descanso');
 
-  // Day 9: Doble turno (Mañana Bendaña + Tarde Bendaña)
-  addShift(9, 'hosp-bendana', 'M', '07:00', '15:00', 'Mañana', 'Maternidad');
-  addShift(9, 'hosp-bendana', 'T', '15:00', '23:00', 'Tarde Extra', 'Maternidad', 'Cubre a colega');
+  // Day 9: Doble turno (TA Bendaña + TB Bendaña)
+  addShift(9, 'hosp-bendana', 'TA', '07:00', '15:00', 'TA', 'Maternidad');
+  addShift(9, 'hosp-bendana', 'TB', '15:00', '23:00', 'TB', 'Maternidad', 'Cubre a colega');
 
-  // Day 11: Noche en Catarino
-  addShift(11, 'hosp-catarino', 'N', '23:00', '07:00', 'Noche', 'UCI Pediátrica');
+  // Day 11: TC en Catarino
+  addShift(11, 'hosp-catarino', 'TC', '23:00', '07:00', 'TC', 'UCI Pediátrica');
 
-  // Day 14: Mañana Bendaña
-  addShift(14, 'hosp-bendana', 'M', '07:00', '15:00', 'Mañana', 'UCI Adultos');
+  // Day 14: TA Bendaña
+  addShift(14, 'hosp-bendana', 'TA', '07:00', '15:00', 'TA', 'UCI Adultos');
 
-  // Day 16: Tarde Catarino
-  addShift(16, 'hosp-catarino', 'T', '15:00', '23:00', 'Tarde', 'Urgencias');
+  // Day 16: TB Catarino
+  addShift(16, 'hosp-catarino', 'TB', '15:00', '23:00', 'TB', 'Urgencias');
 
   // Day 18: Triple turno (24H combinadas)
-  addShift(18, 'hosp-bendana', 'M', '07:00', '15:00', 'Mañana', 'Pediatría');
-  addShift(18, 'hosp-catarino', 'T', '15:00', '23:00', 'Tarde', 'Traumatología');
-  addShift(18, 'hosp-catarino', 'N', '23:00', '07:00', 'Noche', 'Traumatología');
+  addShift(18, 'hosp-bendana', 'TA', '07:00', '15:00', 'TA', 'Pediatría');
+  addShift(18, 'hosp-catarino', 'TB', '15:00', '23:00', 'TB', 'Traumatología');
+  addShift(18, 'hosp-catarino', 'TC', '23:00', '07:00', 'TC', 'Traumatología');
 
   // Day 21: Guardia 24H Catarino
   addShift(21, 'hosp-catarino', '24H', '07:00', '07:00', 'Guardia Completa', 'Emergencias');
 
-  // Day 24: Mañana en Bendaña y Noche en CEMESA
-  addShift(24, 'hosp-bendana', 'M', '07:00', '15:00', 'Mañana', 'Piso 4');
-  addShift(24, 'hosp-cemesa', 'N', '23:00', '07:00', 'Noche Extra', 'Quirófano');
+  // Day 24: TA en Bendaña y TC en CEMESA
+  addShift(24, 'hosp-bendana', 'TA', '07:00', '15:00', 'TA', 'Piso 4');
+  addShift(24, 'hosp-cemesa', 'TC', '23:00', '07:00', 'TC', 'Quirófano');
 
   return shifts;
 }
@@ -245,16 +245,15 @@ export function getStoredHospitals(): Hospital[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.HOSPITALS);
     if (raw === null) {
-      localStorage.setItem(STORAGE_KEYS.HOSPITALS, JSON.stringify(DEFAULT_HOSPITALS));
-      return DEFAULT_HOSPITALS;
+      return [];
     }
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) {
-      return DEFAULT_HOSPITALS;
+      return [];
     }
     return parsed;
   } catch {
-    return DEFAULT_HOSPITALS;
+    return [];
   }
 }
 
