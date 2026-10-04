@@ -248,33 +248,34 @@ export function getStoredHospitals(): Hospital[] {
  * Guarantees a matching hospital object with valid name and shortName.
  */
 export function getHospitalForShift(shift: MedicalShift, hospitals: Hospital[]): Hospital {
-  // 1. Direct ID match in provided hospitals
+  // 1. Direct ID match in user's hospitals
   let found = hospitals.find((h) => h.id === shift.hospitalId);
   if (found) return found;
 
-  // 2. Direct ID match in default hospitals
-  found = DEFAULT_HOSPITALS.find((h) => h.id === shift.hospitalId);
-  if (found) return found;
-
-  // 3. Name or substring match (e.g. 'bendana' -> 'Hospital Bandaña')
-  if (shift.hospitalId) {
+  // 2. Name or substring match against user's actual hospitals
+  if (shift.hospitalId && hospitals.length > 0) {
     const rawId = shift.hospitalId.toLowerCase();
     found = hospitals.find((h) => {
       const hText = `${h.name} ${h.shortName}`.toLowerCase();
       if ((rawId.includes('bendana') || rawId.includes('bandana')) && (hText.includes('benda') || hText.includes('banda'))) return true;
-      if (rawId.includes('catarino') && hText.includes('catarino')) return true;
-      if (rawId.includes('cemesa') && hText.includes('cemesa')) return true;
+      if (rawId.includes('ihss') && hText.includes('ihss')) return true;
+      if (rawId.includes('util') && hText.includes('util')) return true;
+      if (rawId.includes('invio') && hText.includes('invio')) return true;
       return false;
     });
     if (found) return found;
   }
 
-  // 4. Fallback to first user hospital if available
+  // 3. Fallback to user's first workplace if available
   if (hospitals.length > 0) {
     return hospitals[0];
   }
 
-  // 5. Ultimate fallback to default preset
+  // 4. Direct ID match in default presets only if user has 0 workplaces
+  found = DEFAULT_HOSPITALS.find((h) => h.id === shift.hospitalId);
+  if (found) return found;
+
+  // 5. Ultimate fallback
   return DEFAULT_HOSPITALS[0];
 }
 

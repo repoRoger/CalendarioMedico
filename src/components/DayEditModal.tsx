@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   X, Plus, Trash2, Clock, Building2, AlertCircle, Check,
-  Calendar, ShieldAlert, Moon, Sparkles, PlusCircle, MinusCircle,
-  UserCheck, FileText
+  Calendar, ShieldAlert, Moon, UserCheck, FileText, Edit2,
+  ArrowLeft, ChevronRight
 } from 'lucide-react';
 import { Hospital, MedicalShift, ShiftCode, ShiftTemplate } from '../types';
 import { calculateShiftHours, formatFriendlyDate } from '../lib/timeUtils';
-import { DEFAULT_HOSPITALS, getHospitalForShift } from '../lib/storage';
+import { getHospitalForShift } from '../lib/storage';
 
 interface DayEditModalProps {
   isOpen: boolean;
@@ -30,7 +30,20 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
   onSaveDayShifts,
   onOpenHospitalManager,
 }) => {
+  // Array of shifts for this day
   const [shifts, setShifts] = useState<MedicalShift[]>([]);
+
+  // Navigation mode: 'list' (shows all shifts of this day) or 'edit' (edits ONE shift specifically)
+  const [modalMode, setModalMode] = useState<'list' | 'edit'>('list');
+
+  // If editing an existing shift, this is its index; if creating a new shift, this is null
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  // The shift currently being edited in 'edit' mode
+  const [activeShift, setActiveShift] = useState<MedicalShift | null>(null);
+
+  // Validation warning state
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -47,24 +60,37 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
       } else {
         setShifts([]);
       }
+      setModalMode('list');
+      setEditingIndex(null);
+      setActiveShift(null);
+      setValidationError(null);
     }
   }, [isOpen, existingShifts, hospitals]);
 
   if (!isOpen) return null;
 
-  const defaultHospitalId = hospitals[0]?.id || DEFAULT_HOSPITALS[0].id;
+  const defaultHospitalId = hospitals[0]?.id || '';
 
-  const handleAddShift = (templateCode: ShiftCode = 'M', preferredHospitalId?: string) => {
-    const tpl = templates.find((t) => t.code === templateCode) || templates[0];
-    const isCubrir = templateCode === 'C';
-    const startTime = tpl?.defaultStartTime || (isCubrir ? '07:00' : '07:00');
-    const endTime = tpl?.defaultEndTime || (isCubrir ? '15:00' : '15:00');
+  // Start editing an existing shift
+  const handleOpenEditShift = (index: number) => {
+    setEditingIndex(index);
+    setActiveShift(JSON.parse(JSON.stringify(shifts[index])));
+    setValidationError(null);
+    setModalMode('edit');
+  };
+
+  // Start creating a brand new shift
+  const handleOpenNewShift = (preferredCode: ShiftCode = 'M') => {
+    const tpl = templates.find((t) => t.code === preferredCode) || templates[0];
+    const isCubrir = preferredCode === 'C';
+    const startTime = tpl?.defaultStartTime || '07:00';
+    const endTime = tpl?.defaultEndTime || '15:00';
     const calculated = calculateShiftHours(startTime, endTime);
 
     const newShift: MedicalShift = {
       id: `shift-${date}-${Date.now()}-${shifts.length + 1}`,
       date,
-      hospitalId: preferredHospitalId || defaultHospitalId,
+      hospitalId: defaultHospitalId,
       shiftCode: isCubrir ? 'C' : (tpl?.code || 'M'),
       title: isCubrir ? 'Cubrir' : (tpl?.name || 'Turno'),
       startTime,
@@ -76,31 +102,46 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
       isSubstitute: isCubrir,
     };
 
-    setShifts((prev) => [...prev, newShift]);
+    setEditingIndex(null); // Indicates brand new shift
+    setActiveShift(newShift);
+    setValidationError(null);
+    setModalMode('edit');
   };
 
-  const handleUpdateShift = (index: number, updates: Partial<MedicalShift>) => {
-    setShifts((prev) => {
-      const copy = [...prev];
-      const target = { ...copy[index], ...updates };
+  // Update a field inside the active shift
+  const handleUpdateActiveShift = (updates: Partial<MedicalShift>) => {
+    if (!activeShift) return;
+    const target = { ...activeShift, ...updates };
 
-      if (updates.startTime !== undefined || updates.endTime !== undefined) {
-        target.hours = calculateShiftHours(target.startTime, target.endTime);
-        const [sH] = target.startTime.split(':').map(Number);
-        const [eH] = target.endTime.split(':').map(Number);
-        target.isNightShift = sH >= 20 || eH <= 8 || target.shiftCode === 'N' || target.shiftCode === '24H';
-      }
+    if (updates.startTime !== undefined || updates.endTime !== undefined) {
+      target.hours = calculateShiftHours(target.startTime, target.endTime);
+      const [sH] = target.startTime.split(':').map(Number);
+      const [eH] = target.endTime.split(':').map(Number);
+      target.isNightShift = sH >= 20 || eH <= 8 || target.shiftCode === 'N' || target.shiftCode === '24H';
+    }
 
-      copy[index] = target;
-      return copy;
+    // Check duplicate schedule in real-time
+    const duplicate = shifts.some((s, idx) => {
+      if (editingIndex !== null && idx === editingIndex) return false;
+      if (s.shiftCode === 'L') return false;
+      return s.startTime === target.startTime && s.endTime === target.endTime;
     });
+
+    if (duplicate) {
+      setValidationError(`Ya existe otro turno registrado con el mismo horario (${target.startTime} - ${target.endTime}) en este día.`);
+    } else {
+      setValidationError(null);
+    }
+
+    setActiveShift(target);
   };
 
-  const handleApplyTemplate = (index: number, templateCode: ShiftCode) => {
-    const tpl = templates.find((t) => t.code === templateCode);
-    if (!tpl) return;
+  // Apply a template to the active shift
+  const handleApplyTemplateToActive = (code: ShiftCode) => {
+    const tpl = templates.find((t) => t.code === code);
+    if (!tpl || !activeShift) return;
 
-    handleUpdateShift(index, {
+    handleUpdateActiveShift({
       shiftCode: tpl.code,
       title: tpl.name,
       startTime: tpl.defaultStartTime,
@@ -110,19 +151,65 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
     });
   };
 
-  const handleAdjustHours = (index: number, deltaHours: number) => {
-    const shift = shifts[index];
-    if (!shift) return;
-    const [h, m] = shift.endTime.split(':').map(Number);
+  // Adjust hours with +1h / -1h
+  const handleAdjustHoursActive = (deltaHours: number) => {
+    if (!activeShift) return;
+    const [h, m] = activeShift.endTime.split(':').map(Number);
     let newH = (h + deltaHours + 24) % 24;
     const newEnd = `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    handleUpdateShift(index, { endTime: newEnd });
+    handleUpdateActiveShift({ endTime: newEnd });
   };
 
+  // Save the currently edited shift back into the shifts array
+  const handleSaveActiveShift = () => {
+    if (!activeShift) return;
+
+    // Validate duplicate schedule before confirming
+    const duplicate = shifts.find((s, idx) => {
+      if (editingIndex !== null && idx === editingIndex) return false;
+      if (s.shiftCode === 'L') return false;
+      return s.startTime === activeShift.startTime && s.endTime === activeShift.endTime;
+    });
+
+    if (duplicate) {
+      setValidationError(`No se puede guardar: Ya tienes el turno "${duplicate.title}" en el mismo horario (${duplicate.startTime} - ${duplicate.endTime}) para este día.`);
+      return;
+    }
+
+    // Ensure valid hospitalId
+    let finalShift = { ...activeShift };
+    if (!finalShift.hospitalId && hospitals.length > 0) {
+      finalShift.hospitalId = hospitals[0].id;
+    }
+
+    if (editingIndex !== null) {
+      // Update existing shift
+      setShifts((prev) => {
+        const copy = [...prev];
+        copy[editingIndex] = finalShift;
+        return copy;
+      });
+    } else {
+      // Add new shift (remove any 'L' shift if adding a real shift)
+      setShifts((prev) => {
+        const filtered = prev.filter((s) => s.shiftCode !== 'L');
+        return [...filtered, finalShift];
+      });
+    }
+
+    // Return to list view
+    setModalMode('list');
+    setEditingIndex(null);
+    setActiveShift(null);
+    setValidationError(null);
+  };
+
+  // Delete a shift from the list
   const handleRemoveShift = (index: number) => {
     setShifts((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Set the whole day as off (Libre)
   const handleSetDayOff = () => {
     const freeShift: MedicalShift = {
       id: `shift-${date}-${Date.now()}`,
@@ -142,7 +229,8 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
   const totalDayHours = shifts.reduce((acc, s) => acc + (s.hours || 0), 0);
   const is24HourDay = totalDayHours >= 24;
 
-  const handleSave = () => {
+  // Final confirmation to save the whole day
+  const handleSaveWholeDay = () => {
     onSaveDayShifts(date, shifts);
     onClose();
   };
@@ -158,232 +246,261 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
         {/* Mobile Grab Handle */}
         <div className="sm:hidden w-12 h-1.5 bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 shrink-0" />
 
-        {/* Header */}
-        <div className="px-4 sm:px-6 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/80 shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 shrink-0">
-              <Calendar className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-bold text-slate-100 capitalize truncate">
-                {formatFriendlyDate(date)}
-              </h2>
-              <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                <span className="font-mono text-teal-400 font-bold">{totalDayHours}h totales</span>
-                <span>·</span>
-                <span>{shifts.length} {shifts.length === 1 ? 'turno' : 'turnos'}</span>
+        {/* Modal Header */}
+        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between gap-3 bg-slate-950/50 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            {modalMode === 'edit' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setModalMode('list');
+                  setActiveShift(null);
+                  setEditingIndex(null);
+                  setValidationError(null);
+                }}
+                className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors shrink-0"
+                title="Volver al listado de turnos"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            ) : (
+              <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center shrink-0">
+                <Calendar className="w-5 h-5" />
               </div>
-            </div>
-          </div>
+            )}
 
-          <button
-            onClick={onClose}
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-slate-200 p-2 rounded-xl transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* 24-Hour Continuous Work Banner (Extreme Fatigue) */}
-        {is24HourDay && (
-          <div className="mx-4 sm:mx-6 mt-3 p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center gap-3 text-xs text-amber-200 shrink-0">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/20 font-mono font-extrabold flex items-center justify-center text-amber-300 shrink-0">
-              24H
-            </div>
-            <div>
-              <p className="font-bold text-amber-300">¡Jornada de 24 Horas Reales!</p>
-              <p className="text-amber-200/80 text-[11px]">
-                3 turnos consecutivos o guardia completa. ¡Recuerda descansar después!
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-black text-slate-100 capitalize truncate">
+                {modalMode === 'edit'
+                  ? editingIndex !== null
+                    ? `Editar Turno #${editingIndex + 1}`
+                    : 'Nuevo Turno'
+                  : formatFriendlyDate(date)}
+              </h2>
+              <p className="text-xs text-slate-400">
+                {modalMode === 'edit'
+                  ? formatFriendlyDate(date)
+                  : `${shifts.length} ${shifts.length === 1 ? 'turno registrado' : 'turnos registrados'} · ${totalDayHours} horas totales`}
               </p>
             </div>
           </div>
-        )}
 
-        {/* Scrollable Body */}
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4">
-          {shifts.length === 0 ? (
-            /* Empty State with Mobile One-Tap Quick Buttons */
-            <div className="text-center py-6 px-3 rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 space-y-3">
-              <Clock className="w-8 h-8 text-teal-500/60 mx-auto" />
-              <div>
-                <p className="text-xs font-semibold text-slate-200">Sin turnos en este día</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Toca para agregar directamente con tu horario recomendado:
-                </p>
-              </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {modalMode === 'list' && is24HourDay && (
+              <span className="bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[11px] font-black px-2.5 py-1 rounded-xl flex items-center gap-1">
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                24 Horas
+              </span>
+            )}
 
-              {/* Big Touch-Friendly Preset Pills */}
-              <div className="grid grid-cols-2 gap-2 pt-1 max-w-sm mx-auto">
-                <button
-                  type="button"
-                  onClick={() => handleAddShift('M')}
-                  className="min-h-[48px] p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold flex items-center justify-between border border-slate-700 transition-all active:scale-95"
-                >
-                  <span className="font-bold">Mañana</span>
-                  <span className="text-[11px] text-teal-400 font-mono">07:00-15:00</span>
-                </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Cerrar ventana"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleAddShift('T')}
-                  className="min-h-[48px] p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold flex items-center justify-between border border-slate-700 transition-all active:scale-95"
-                >
-                  <span className="font-bold">Tarde</span>
-                  <span className="text-[11px] text-orange-400 font-mono">15:00-23:00</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleAddShift('N')}
-                  className="min-h-[48px] p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold flex items-center justify-between border border-slate-700 transition-all active:scale-95"
-                >
-                  <span className="font-bold flex items-center gap-1">
-                    <Moon className="w-3.5 h-3.5 text-indigo-400" /> Noche
-                  </span>
-                  <span className="text-[11px] text-indigo-400 font-mono">23:00-07:00</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleAddShift('24H')}
-                  className="min-h-[48px] p-2.5 rounded-xl bg-gradient-to-r from-rose-900/40 to-amber-900/40 hover:from-rose-900/60 hover:to-amber-900/60 text-slate-100 text-xs font-semibold flex items-center justify-between border border-rose-500/40 transition-all active:scale-95"
-                >
-                  <span className="font-bold text-rose-300">Guardia 24H</span>
-                  <span className="text-[11px] text-amber-300 font-mono">24h</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleAddShift('C')}
-                  className="min-h-[48px] p-2.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 text-slate-100 text-xs font-semibold flex items-center justify-between border border-amber-500/40 transition-all active:scale-95 col-span-2"
-                >
-                  <span className="font-bold text-amber-300 flex items-center gap-1.5">
-                    <UserCheck className="w-3.5 h-3.5" /> Cubrir a alguien (Cambio)
-                  </span>
-                  <span className="text-[11px] text-amber-400 font-mono">07:00-15:00</span>
-                </button>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={handleSetDayOff}
-                  className="text-xs text-slate-400 hover:text-emerald-400 py-1 transition-colors"
-                >
-                  Marcar como Día Libre (Descanso)
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* Populated Shifts: Mobile Card layout */
-            shifts.map((shift, idx) => {
-              const currentHospital = hospitals.find((h) => h.id === shift.hospitalId);
-
-              return (
-                <div
-                  key={shift.id || idx}
-                  className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3 relative shadow-md"
-                >
-                  {/* Turno Header with Hospital Gradient Pill */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-lg bg-slate-800 text-teal-400 font-mono text-xs flex items-center justify-center font-bold">
-                        #{idx + 1}
-                      </span>
-                      {currentHospital && (
-                        <div
-                          className="px-2.5 py-1 rounded-xl text-xs font-bold text-white shadow-sm flex items-center gap-1.5"
-                          style={{
-                            background: `linear-gradient(135deg, ${currentHospital.gradientStart}, ${currentHospital.gradientEnd})`,
-                          }}
-                        >
-                          <Building2 className="w-3.5 h-3.5" />
-                          <span>{currentHospital.shortName}</span>
-                        </div>
-                      )}
-                      <span className="text-xs font-mono font-bold text-teal-400 bg-teal-950/60 px-2 py-0.5 rounded-lg border border-teal-800/40">
-                        {shift.hours}h
-                      </span>
+        {/* Modal Body: Switch between 'list' and 'edit' */}
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
+          <AnimatePresence mode="wait">
+            {modalMode === 'list' ? (
+              /* VIEW 1: LISTADO DE TURNOS DEL DÍA */
+              <motion.div
+                key="list-view"
+                initial={{ opacity: 0, x: -15 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 15 }}
+                className="space-y-4"
+              >
+                {/* List of Shifts for this Day */}
+                {shifts.length === 0 ? (
+                  <div className="py-10 text-center space-y-3 bg-slate-950/40 rounded-2xl border border-dashed border-slate-800 p-6">
+                    <Clock className="w-10 h-10 text-slate-600 mx-auto" />
+                    <div>
+                      <p className="text-sm font-bold text-slate-200">No hay turnos registrados en este día</p>
+                      <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+                        Puedes agregar turnos de trabajo o marcar el día como descanso.
+                      </p>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveShift(idx)}
-                      className="min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-400 hover:text-rose-400 p-1 rounded-lg"
-                      title="Eliminar este turno"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {shifts.map((shift, idx) => {
+                      const hosp = getHospitalForShift(shift, hospitals);
+                      const isLibre = shift.shiftCode === 'L';
 
-                  {/* Mobile Hospital Quick Selector (Horizontal Touch Cards) */}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-400 mb-1.5">
-                      Lugar de Trabajo / Centro:
-                    </label>
-                    {hospitals.length === 0 ? (
-                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between text-xs">
-                        <span className="text-slate-400">No tienes centros o empresas creados todavía.</span>
-                        <button
-                          type="button"
-                          onClick={onOpenHospitalManager}
-                          className="px-2.5 py-1.5 bg-teal-500/10 border border-teal-500/30 text-teal-300 font-bold rounded-lg hover:bg-teal-500/20 transition-colors"
+                      return (
+                        <div
+                          key={shift.id || idx}
+                          className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors group"
                         >
-                          + Crear centro
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                        {hospitals.map((hosp) => {
-                          const isSelected = shift.hospitalId === hosp.id;
-                          return (
-                            <button
-                              key={hosp.id}
-                              type="button"
-                              onClick={() => handleUpdateShift(idx, { hospitalId: hosp.id })}
-                              className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shrink-0 border ${
-                                isSelected
-                                  ? 'text-white border-teal-400 shadow-md ring-1 ring-teal-400'
-                                  : 'text-slate-400 bg-slate-900 border-slate-800 hover:text-slate-200'
-                              }`}
+                          <div className="flex items-center gap-3 min-w-0">
+                            {/* Hospital or Free icon badge */}
+                            <div
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 font-bold text-xs shadow-md"
                               style={{
-                                background: isSelected
-                                  ? `linear-gradient(135deg, ${hosp.gradientStart}, ${hosp.gradientEnd})`
-                                  : undefined,
+                                background: isLibre
+                                  ? '#334155'
+                                  : `linear-gradient(135deg, ${hosp?.gradientStart || '#0d9488'}, ${hosp?.gradientEnd || '#059669'})`,
                               }}
                             >
-                              <Building2 className="w-3.5 h-3.5" />
-                              <span>{hosp.shortName}</span>
+                              {isLibre ? <Moon className="w-5 h-5 text-slate-300" /> : <Building2 className="w-5 h-5" />}
+                            </div>
+
+                            <div className="min-w-0 space-y-0.5">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-extrabold text-sm text-slate-100 truncate">
+                                  {isLibre ? 'Día Libre' : (hosp?.shortName || hosp?.name || 'Centro')}
+                                </span>
+
+                                <span className="px-2 py-0.5 rounded-md bg-slate-800 text-teal-300 text-xs font-mono font-bold">
+                                  {shift.shiftCode}: {shift.title}
+                                </span>
+
+                                {!isLibre && (
+                                  <span className="text-xs text-slate-400 font-mono">
+                                    {shift.startTime} - {shift.endTime}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 text-xs text-slate-400 truncate">
+                                {!isLibre && (
+                                  <span className="font-bold text-teal-400 font-mono">
+                                    {shift.hours}h laboradas
+                                  </span>
+                                )}
+                                {shift.department && <span>· {shift.department}</span>}
+                                {shift.notes && <span className="italic">· {shift.notes}</span>}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Action Buttons for this single shift */}
+                          <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditShift(idx)}
+                              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-teal-600 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 min-h-[36px]"
+                              title="Editar este turno específico"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                              <span>Editar</span>
                             </button>
-                          );
-                        })}
-                        <button
-                          type="button"
-                          onClick={onOpenHospitalManager}
-                          className="min-h-[44px] px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-teal-300 border border-dashed border-slate-700 shrink-0 flex items-center gap-1"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Otro</span>
-                        </button>
-                      </div>
-                    )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveShift(idx)}
+                              className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors border border-slate-700 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                              title="Eliminar este turno"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Quick Add Buttons in List View */}
+                <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenNewShift('M')}
+                    className="flex-1 py-3 px-4 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-teal-900/30 transition-all active:scale-[0.98] min-h-[44px]"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Agregar Turno a este día</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSetDayOff}
+                    className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition-colors min-h-[44px]"
+                  >
+                    <Moon className="w-4 h-4 text-purple-400" />
+                    <span>Marcar Día Libre</span>
+                  </button>
+                </div>
+              </motion.div>
+            ) : (
+              /* VIEW 2: EDICIÓN UNO A UNO DE UN TURNO ESPECÍFICO */
+              activeShift && (
+                <motion.div
+                  key="edit-view"
+                  initial={{ opacity: 0, x: 15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -15 }}
+                  className="space-y-4"
+                >
+                  {/* Duplicate Schedule Warning */}
+                  {validationError && (
+                    <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5 font-medium animate-pulse">
+                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <span>{validationError}</span>
+                    </div>
+                  )}
+
+                  {/* 1. Selector de Centro de Trabajo */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-300">
+                      Centro de Trabajo / Lugar:
+                    </label>
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                      {hospitals.map((hosp) => {
+                        const isSelected = activeShift.hospitalId === hosp.id;
+                        return (
+                          <button
+                            key={hosp.id}
+                            type="button"
+                            onClick={() => handleUpdateActiveShift({ hospitalId: hosp.id })}
+                            className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 border ${
+                              isSelected
+                                ? 'text-white border-teal-400 shadow-md ring-1 ring-teal-400'
+                                : 'text-slate-400 bg-slate-950 border-slate-800 hover:text-slate-200'
+                            }`}
+                            style={{
+                              background: isSelected
+                                ? `linear-gradient(135deg, ${hosp.gradientStart}, ${hosp.gradientEnd})`
+                                : undefined,
+                            }}
+                          >
+                            <Building2 className="w-4 h-4" />
+                            <span>{hosp.shortName}</span>
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        type="button"
+                        onClick={onOpenHospitalManager}
+                        className="min-h-[44px] px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-teal-300 border border-dashed border-slate-700 shrink-0 flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Nuevo Centro</span>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Shift Template Quick Touch Buttons */}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-400 mb-1.5">
-                      Horario Recomendado:
+                  {/* 2. Botones rápidos de Tipo de Turno */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-300">
+                      Horario Recomendado / Plantilla:
                     </label>
                     <div className="flex gap-1.5 overflow-x-auto pb-1">
                       {templates.map((tpl) => (
                         <button
                           key={tpl.id}
                           type="button"
-                          onClick={() => handleApplyTemplate(idx, tpl.code)}
-                          className={`min-h-[38px] px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
-                            shift.shiftCode === tpl.code
+                          onClick={() => handleApplyTemplateToActive(tpl.code)}
+                          className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                            activeShift.shiftCode === tpl.code
                               ? 'bg-slate-700 text-teal-300 border border-teal-500/40 shadow-sm'
-                              : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-slate-200'
+                              : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-slate-200'
                           }`}
                         >
                           {tpl.code}: {tpl.name}
@@ -392,38 +509,38 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Exact Hours Inputs with Stepper for easy thumb usage */}
+                  {/* 3. Ajuste de Horas Inicio y Fin */}
                   <div className="grid grid-cols-2 gap-3 pt-1">
-                    <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-800">
-                      <label className="block text-[10px] text-slate-400 uppercase font-semibold mb-1">
+                    <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                      <label className="block text-[11px] text-slate-400 uppercase font-bold mb-1">
                         Hora Inicio
                       </label>
                       <input
                         type="time"
-                        value={shift.startTime}
-                        onChange={(e) => handleUpdateShift(idx, { startTime: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-xs font-mono text-slate-100 min-h-[44px] focus:outline-none focus:border-teal-500"
+                        value={activeShift.startTime}
+                        onChange={(e) => handleUpdateActiveShift({ startTime: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-slate-100 min-h-[44px] focus:outline-none focus:border-teal-500"
                       />
                     </div>
 
-                    <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-800">
+                    <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-[10px] text-slate-400 uppercase font-semibold">
+                        <label className="text-[11px] text-slate-400 uppercase font-bold">
                           Hora Fin
                         </label>
                         <div className="flex gap-1">
                           <button
                             type="button"
-                            onClick={() => handleAdjustHours(idx, -1)}
-                            className="text-[10px] px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700"
+                            onClick={() => handleAdjustHoursActive(-1)}
+                            className="text-[10px] px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 font-mono"
                             title="-1 hora"
                           >
                             -1h
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleAdjustHours(idx, 1)}
-                            className="text-[10px] px-1.5 py-0.5 bg-slate-800 text-teal-300 rounded hover:bg-slate-700"
+                            onClick={() => handleAdjustHoursActive(1)}
+                            className="text-[10px] px-1.5 py-0.5 bg-slate-800 text-teal-300 rounded hover:bg-slate-700 font-mono"
                             title="+1 hora"
                           >
                             +1h
@@ -432,108 +549,108 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                       </div>
                       <input
                         type="time"
-                        value={shift.endTime}
-                        onChange={(e) => handleUpdateShift(idx, { endTime: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-xs font-mono text-slate-100 min-h-[44px] focus:outline-none focus:border-teal-500"
+                        value={activeShift.endTime}
+                        onChange={(e) => handleUpdateActiveShift({ endTime: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-slate-100 min-h-[44px] focus:outline-none focus:border-teal-500"
                       />
                     </div>
                   </div>
 
-                  {/* Área/Puesto y Notas con Chips */}
-                  <div className="space-y-2 pt-1">
-                    <input
-                      type="text"
-                      placeholder="Área, puesto o sala (ej. Emergencias, Piso 4, Línea 2, Caja 1...)"
-                      value={shift.department || ''}
-                      onChange={(e) => handleUpdateShift(idx, { department: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-teal-500"
-                    />
+                  {/* Summary of this shift's hours */}
+                  <div className="p-3 rounded-xl bg-teal-950/40 border border-teal-800/40 flex items-center justify-between">
+                    <span className="text-xs text-teal-200">Duración de este turno:</span>
+                    <span className="text-sm font-black text-teal-300 font-mono">
+                      {activeShift.hours} horas
+                    </span>
+                  </div>
 
-                    {/* Nota del turno con chips de acceso rápido */}
-                    <div className="space-y-1.5 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80">
-                      <div className="flex items-center justify-between gap-1 flex-wrap">
-                        <label className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
-                          <FileText className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Nota del turno:</span>
-                        </label>
-                        <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none">
-                          {['Cubriendo a...', 'Cambio de turno', 'Turno extra', 'Relevo'].map((tag) => (
-                            <button
-                              key={tag}
-                              type="button"
-                              onClick={() => {
-                                const current = shift.notes || '';
-                                const addition = tag.endsWith('...') ? 'Cubriendo a ' : tag;
-                                handleUpdateShift(idx, {
-                                  notes: current ? `${current} · ${addition}` : addition,
-                                  isSubstitute: tag.includes('Cubriendo') || tag.includes('Cambio') ? true : shift.isSubstitute,
-                                });
-                              }}
-                              className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-300/90 hover:text-amber-200 transition-colors shrink-0"
-                            >
-                              {tag}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                  {/* 4. Departamento y Notas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-medium text-slate-300">
+                        Área / Departamento (opcional)
+                      </label>
                       <input
                         type="text"
-                        placeholder="Ej. Cubriendo a Carmen, Cambio con David, Relevo 30min antes..."
-                        value={shift.notes || ''}
-                        onChange={(e) =>
-                          handleUpdateShift(idx, {
-                            notes: e.target.value,
-                            isSubstitute:
-                              e.target.value.toLowerCase().includes('cubr') ||
-                              e.target.value.toLowerCase().includes('cambio'),
-                          })
-                        }
-                        className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-400/70"
+                        placeholder="Ej: Emergencias, UCI, Piso 3"
+                        value={activeShift.department || ''}
+                        onChange={(e) => handleUpdateActiveShift({ department: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-600 min-h-[42px] focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-xs font-medium text-slate-300">
+                        Notas u Observaciones (opcional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Cubre a colega, doble jornada"
+                        value={activeShift.notes || ''}
+                        onChange={(e) => handleUpdateActiveShift({ notes: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-600 min-h-[42px] focus:outline-none focus:border-teal-500"
                       />
                     </div>
                   </div>
-                </div>
-              );
-            })
-          )}
 
-          {/* Quick Button to Add 2nd / 3rd Shift for 24h work */}
-          <div className="pt-2 flex flex-col sm:flex-row gap-2">
-            <button
-              type="button"
-              onClick={() => handleAddShift('T')}
-              className="w-full min-h-[48px] py-2.5 px-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-teal-300 font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 transition-all active:scale-[0.98]"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Agregar otro turno (Turno 2 o 3 para 24 horas)</span>
-            </button>
-          </div>
+                  {/* Action buttons inside Edit Mode */}
+                  <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalMode('list');
+                        setActiveShift(null);
+                        setEditingIndex(null);
+                        setValidationError(null);
+                      }}
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors min-h-[42px]"
+                    >
+                      Cancelar
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveActiveShift}
+                      disabled={!!validationError}
+                      className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-teal-900/40 transition-all active:scale-95 min-h-[42px]"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{editingIndex !== null ? 'Guardar Turno' : 'Añadir Turno'}</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Sticky Bottom Actions */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900/95 flex items-center justify-between gap-3 shrink-0">
-          <div className="text-xs text-slate-400">
-            Total: <strong className="font-mono text-teal-400 text-sm">{totalDayHours}h</strong>
-          </div>
+        {/* Modal Footer in List Mode */}
+        {modalMode === 'list' && (
+          <div className="p-4 sm:p-5 border-t border-slate-800 flex items-center justify-between gap-3 bg-slate-950/70 shrink-0">
+            <span className="text-xs text-slate-400 font-mono">
+              Total día: <strong className="text-teal-400 font-bold">{totalDayHours}h</strong>
+            </span>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-[44px] px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="min-h-[48px] px-6 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-teal-900/30 transition-all active:scale-[0.98]"
-            >
-              <Check className="w-4 h-4" />
-              <span>Guardar Turnos</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors min-h-[42px]"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveWholeDay}
+                className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-teal-900/40 transition-all active:scale-95 min-h-[42px]"
+              >
+                <Check className="w-4 h-4" />
+                <span>Guardar y Cerrar</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </motion.div>
     </div>
   );
