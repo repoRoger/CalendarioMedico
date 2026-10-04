@@ -1,10 +1,12 @@
 import React from 'react';
-import { User, LogOut, BarChart3, Share2 } from 'lucide-react';
+import { User, LogOut, BarChart3, Share2, RefreshCw } from 'lucide-react';
 import { UserSession } from '../types';
 
 interface HeaderProps {
   user: UserSession;
   onOpenProfile: () => void;
+  onSyncCloud?: () => void;
+  isSyncingCloud?: boolean;
   onOpenStats?: () => void;
   onOpenExport?: () => void;
   onLogout: () => void;
@@ -13,6 +15,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   user,
   onOpenProfile,
+  onSyncCloud,
+  isSyncingCloud = false,
   onOpenStats,
   onOpenExport,
   onLogout,
@@ -43,13 +47,25 @@ export const Header: React.FC<HeaderProps> = ({
               {user.name}
             </h1>
             <p className="text-[11px] text-slate-400 truncate">
-              {user.specialty || 'Honduras'} · <span className="text-teal-400 font-medium">Turnos</span>
+              {user.specialty || 'Honduras'} · <span className="text-teal-400 font-medium">{user.email ? user.email.split('@')[0] : 'Turnos'}</span>
             </p>
           </div>
         </button>
 
-        {/* Right: Quick actions (Stats, Export, Logout) */}
+        {/* Right: Quick actions (Sync, Stats, Export, Logout) */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {onSyncCloud && (
+            <button
+              onClick={onSyncCloud}
+              disabled={isSyncingCloud}
+              className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 min-h-[38px] disabled:opacity-50"
+              title="Descargar y sincronizar turnos con Turso en la nube"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-teal-400 ${isSyncingCloud ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isSyncingCloud ? 'Cargando...' : 'Nube'}</span>
+            </button>
+          )}
+
           {onOpenStats && (
             <button
               onClick={onOpenStats}

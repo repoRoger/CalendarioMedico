@@ -70,6 +70,9 @@ export default function App() {
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ShiftTemplate | null>(null);
 
+  // Cloud Sync State
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+
   // LED Notifications
   const [notifications, setNotifications] = useState<LedMessage[]>([]);
 
@@ -86,6 +89,71 @@ export default function App() {
   const dismissNotification = (id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
+
+  // Sync Cloud bidirectional (fetch latest from Turso, or upload local if remote is empty)
+  const handleSyncCloud = async (isSilent = false) => {
+    if (!user.email || !tursoConfig.databaseUrl || !tursoConfig.authToken) {
+      if (!isSilent) addNotification('warning', 'Sin sesión', 'Inicia sesión con tu correo para sincronizar.');
+      return;
+    }
+
+    setIsSyncingCloud(true);
+    try {
+      const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+
+      // 1. Fetch remote shifts for this user from Turso
+      const remoteShifts = await fetchShiftsFromTurso(client, user.email);
+
+      if (remoteShifts && remoteShifts.length > 0) {
+        setShifts(remoteShifts);
+        saveStoredShifts(remoteShifts);
+        if (!isSilent) {
+          addNotification(
+            'success',
+            'Nube Turso sincronizada',
+            `Se descargaron ${remoteShifts.length} turnos desde Turso.`
+          );
+        }
+      } else if (shifts.length > 0) {
+        // If remote has no shifts for this user, upload local shifts to Turso
+        const res = await syncLocalDataToTurso(client, user.email, shifts, hospitals, templates);
+        if (!isSilent && res.success) {
+          addNotification('success', 'Nube Turso actualizada', `Guardados ${shifts.length} turnos.`);
+        }
+      }
+
+      // 2. Fetch remote hospitals
+      const remoteHospitals = await fetchHospitalsFromTurso(client, user.email);
+      if (remoteHospitals && remoteHospitals.length > 0) {
+        setHospitals(remoteHospitals);
+        saveStoredHospitals(remoteHospitals);
+      }
+
+      // 3. Fetch remote profile
+      const remoteProfile = await fetchUserProfileFromTurso(client, user.email);
+      if (remoteProfile) {
+        setUser((prev) => {
+          const merged = { ...prev, ...remoteProfile, isLoggedIn: true };
+          saveStoredUser(merged);
+          return merged;
+        });
+      }
+    } catch (err: any) {
+      console.warn('Sync cloud error:', err);
+      if (!isSilent) {
+        addNotification('warning', 'Aviso Turso', err.message || 'Error de conexión a Turso');
+      }
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
+
+  // Auto-fetch from Turso on app load/mount
+  useEffect(() => {
+    if (user.email && user.isLoggedIn) {
+      handleSyncCloud(true);
+    }
+  }, [user.email, user.isLoggedIn]);
 
   // Month navigation
   const currentYear = currentDate.getFullYear();
@@ -298,26 +366,7 @@ export default function App() {
   };
 
   const handleManualTursoSync = async () => {
-    if (!tursoConfig.databaseUrl || !tursoConfig.authToken) {
-      addNotification('warning', 'Sin conexión', 'No hay credenciales de Turso.');
-      return;
-    }
-    if (!user.email) {
-      addNotification('warning', 'Sin correo', 'Inicia sesión con un correo para respaldar.');
-      return;
-    }
-    try {
-      addNotification('info', 'Sincronizando con Turso...', 'Subiendo turnos y centros');
-      const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-      const res = await syncLocalDataToTurso(client, user.email, shifts, hospitals, templates);
-      if (res.success) {
-        addNotification('success', 'Nube Turso sincronizada', res.message);
-      } else {
-        addNotification('warning', 'Aviso de Turso', res.message);
-      }
-    } catch (err: any) {
-      addNotification('warning', 'Error en Turso', err.message || 'Error de conexión');
-    }
+    await handleSyncCloud(false);
   };
 
   const handleSaveTemplates = (updatedTemplates: ShiftTemplate[]) => {
@@ -378,10 +427,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans pb-16 md:pb-6">
-      {/* Top Bar: Shows user title & name (Lic. Roger Adan) and minimal actions */}
+      {/* Top Bar: Shows user title & name (Lic. Roger Adan) and cloud sync button */}
       <Header
         user={user}
         onOpenProfile={() => setIsProfileModalOpen(true)}
+        onSyncCloud={() => handleSyncCloud(false)}
+        isSyncingCloud={isSyncingCloud}
         onOpenStats={() => setIsStatsModalOpen(true)}
         onOpenExport={() => setIsExportModalOpen(true)}
         onLogout={handleLogout}
