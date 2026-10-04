@@ -141,6 +141,30 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
 
   // Apply a template to the active shift
   const handleApplyTemplateToActive = (code: ShiftCode) => {
+    if (code === 'L') {
+      handleUpdateActiveShift({
+        shiftCode: 'L',
+        title: 'Día Libre / Descanso',
+        startTime: '00:00',
+        endTime: '00:00',
+        hours: 0,
+        isNightShift: false,
+      });
+      return;
+    }
+
+    if (code === 'LIBRE') {
+      handleUpdateActiveShift({
+        shiftCode: 'LIBRE',
+        title: 'Libre turno',
+        startTime: '00:00',
+        endTime: '00:00',
+        hours: 0,
+        isNightShift: false,
+      });
+      return;
+    }
+
     const tpl = templates.find((t) => t.code === code);
     if (!tpl || !activeShift) return;
 
@@ -526,7 +550,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                               : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-slate-200'
                           }`}
                         >
-                          {tpl.code}: {tpl.name}
+                          {tpl.name || tpl.code}
                         </button>
                       ))}
                     </div>

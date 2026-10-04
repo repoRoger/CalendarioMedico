@@ -74,14 +74,14 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
               key={dayItem.date}
               onClick={() => onSelectDate(dayItem.date)}
               className={`min-h-[125px] sm:min-h-[135px] p-1 sm:p-1.5 flex flex-col justify-between transition-all cursor-pointer relative group ${
-                is24H
+                dayItem.isToday
+                  ? 'samsung-today-edge'
+                  : is24H
                   ? 'ring-2 ring-inset ring-amber-500/70 bg-amber-950/25 animate-pulse'
                   : isWholeDayLibre
                   ? 'bg-emerald-950/20 ring-1 ring-inset ring-emerald-500/30'
                   : !dayItem.isCurrentMonth
                   ? 'opacity-35 bg-slate-950/30'
-                  : dayItem.isToday
-                  ? 'bg-teal-950/20 ring-1 ring-inset ring-teal-500/30'
                   : dayItem.isWeekend
                   ? 'bg-slate-900/30'
                   : 'hover:bg-slate-800/40'

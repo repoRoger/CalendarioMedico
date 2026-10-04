@@ -83,9 +83,20 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     isNightShift: true,
   },
   {
+    id: 'tpl-24h',
+    code: '24H',
+    name: '24H',
+    defaultStartTime: '07:00',
+    defaultEndTime: '07:00',
+    defaultHours: 24,
+    description: 'Guardia completa de 24 horas continuas',
+    colorBadge: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+    isNightShift: true,
+  },
+  {
     id: 'tpl-tatb',
     code: 'TA-TB',
-    name: 'Mixto TA-TB',
+    name: 'TA-TB',
     defaultStartTime: '07:00',
     defaultEndTime: '23:00',
     defaultHours: 16,
@@ -96,7 +107,7 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
   {
     id: 'tpl-tbtc',
     code: 'TB-TC',
-    name: 'Mixto TB-TC',
+    name: 'TB-TC',
     defaultStartTime: '15:00',
     defaultEndTime: '07:00',
     defaultHours: 16,
@@ -107,7 +118,7 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
   {
     id: 'tpl-tcta',
     code: 'TC-TA',
-    name: 'Mixto TC-TA',
+    name: 'TC-TA',
     defaultStartTime: '23:00',
     defaultEndTime: '15:00',
     defaultHours: 16,
@@ -116,20 +127,9 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     isNightShift: true,
   },
   {
-    id: 'tpl-24h',
-    code: '24H',
-    name: 'Guardia 24H',
-    defaultStartTime: '07:00',
-    defaultEndTime: '07:00',
-    defaultHours: 24,
-    description: 'Guardia completa de 24 horas continuas',
-    colorBadge: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
-    isNightShift: true,
-  },
-  {
-    id: 'tpl-libre',
+    id: 'tpl-libre-turno',
     code: 'LIBRE',
-    name: 'Libre (Centro)',
+    name: 'Libre turno',
     defaultStartTime: '00:00',
     defaultEndTime: '00:00',
     defaultHours: 0,
@@ -138,14 +138,14 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     isNightShift: false,
   },
   {
-    id: 'tpl-c',
-    code: 'C',
-    name: 'Cubrir',
-    defaultStartTime: '07:00',
-    defaultEndTime: '15:00',
-    defaultHours: 8,
-    description: 'Reemplazo o cambio de turno cubriendo a un compañero/a',
-    colorBadge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    id: 'tpl-libre-total',
+    code: 'L',
+    name: 'Libre total',
+    defaultStartTime: '00:00',
+    defaultEndTime: '00:00',
+    defaultHours: 0,
+    description: 'Día completo de descanso (0h)',
+    colorBadge: 'bg-emerald-600/20 text-emerald-200 border-emerald-500/40',
     isNightShift: false,
   },
 ];
@@ -351,13 +351,33 @@ export function getStoredTemplates(): ShiftTemplate[] {
       return DEFAULT_TEMPLATES;
     }
     const parsed: ShiftTemplate[] = JSON.parse(raw);
-    const merged = [...parsed];
-    DEFAULT_TEMPLATES.forEach((dt) => {
-      if (!merged.some((m) => m.code === dt.code)) {
-        merged.push(dt);
+    // Filter out legacy duplicates (M, T, N, D)
+    const cleaned = parsed.filter((t) => !['M', 'T', 'N', 'D'].includes(t.code));
+
+    // Order: Básicos (TA, TB, TC, 24H), Mixtos (TA-TB, TB-TC, TC-TA), Libres (LIBRE, L)
+    const orderedCodes: ShiftCode[] = ['TA', 'TB', 'TC', '24H', 'TA-TB', 'TB-TC', 'TC-TA', 'LIBRE', 'L'];
+
+    const result: ShiftTemplate[] = [];
+    orderedCodes.forEach((code) => {
+      const defMatch = DEFAULT_TEMPLATES.find((dt) => dt.code === code);
+      const userMatch = cleaned.find((t) => t.code === code);
+      if (defMatch) {
+        // Keep the clean, modern name and timestamps from DEFAULT_TEMPLATES
+        result.push(userMatch ? { ...defMatch, ...userMatch, name: defMatch.name } : defMatch);
+      } else if (userMatch) {
+        result.push(userMatch);
       }
     });
-    return merged;
+
+    // Keep any other custom templates
+    cleaned.forEach((t) => {
+      if (!orderedCodes.includes(t.code) && !result.some((r) => r.id === t.id)) {
+        result.push(t);
+      }
+    });
+
+    localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(result));
+    return result;
   } catch {
     return DEFAULT_TEMPLATES;
   }
