@@ -257,7 +257,17 @@ export default function App() {
     if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
       try {
         const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-        syncLocalDataToTurso(client, user.email, nextShifts, hospitals, templates);
+        syncLocalDataToTurso(client, user.email, nextShifts, hospitals, templates)
+          .then((res) => {
+            if (res.success) {
+              addNotification('success', 'Nube Turso actualizada', `Guardados ${res.syncedShiftsCount} turnos.`);
+            } else {
+              addNotification('warning', 'Aviso Turso', res.message);
+            }
+          })
+          .catch((err) => {
+            console.warn('Background Turso sync skipped:', err);
+          });
       } catch (err) {
         console.warn('Background Turso sync skipped:', err);
       }
@@ -272,10 +282,41 @@ export default function App() {
     if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
       try {
         const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-        syncLocalDataToTurso(client, user.email, shifts, updatedHospitals, templates);
+        syncLocalDataToTurso(client, user.email, shifts, updatedHospitals, templates)
+          .then((res) => {
+            if (res.success) {
+              addNotification('success', 'Nube Turso actualizada', `Guardados ${res.syncedHospitalsCount} centros.`);
+            }
+          })
+          .catch((err) => {
+            console.warn('Background Turso sync skipped:', err);
+          });
       } catch (err) {
         console.warn('Background Turso sync skipped:', err);
       }
+    }
+  };
+
+  const handleManualTursoSync = async () => {
+    if (!tursoConfig.databaseUrl || !tursoConfig.authToken) {
+      addNotification('warning', 'Sin conexión', 'No hay credenciales de Turso.');
+      return;
+    }
+    if (!user.email) {
+      addNotification('warning', 'Sin correo', 'Inicia sesión con un correo para respaldar.');
+      return;
+    }
+    try {
+      addNotification('info', 'Sincronizando con Turso...', 'Subiendo turnos y centros');
+      const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+      const res = await syncLocalDataToTurso(client, user.email, shifts, hospitals, templates);
+      if (res.success) {
+        addNotification('success', 'Nube Turso sincronizada', res.message);
+      } else {
+        addNotification('warning', 'Aviso de Turso', res.message);
+      }
+    } catch (err: any) {
+      addNotification('warning', 'Error en Turso', err.message || 'Error de conexión');
     }
   };
 
@@ -597,6 +638,7 @@ export default function App() {
             hospitals={hospitals}
             shifts={shifts}
             onOpenEditModal={() => setIsProfileModalOpen(true)}
+            onManualSync={handleManualTursoSync}
             onLogout={handleLogout}
           />
         )}

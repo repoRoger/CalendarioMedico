@@ -78,6 +78,13 @@ export async function initializeTursoTables(client: Client): Promise<void> {
     )
   `);
 
+  // Migration: ensure tipo_negocio exists if table was created in older schema
+  try {
+    await client.execute(`ALTER TABLE hospitales ADD COLUMN tipo_negocio TEXT`);
+  } catch {
+    // Column already exists, safe to ignore
+  }
+
   // Index on cliente_correo
   await client.execute(`
     CREATE INDEX IF NOT EXISTS idx_hospitales_usuario 
@@ -187,37 +194,41 @@ export async function syncLocalDataToTurso(
   try {
     await initializeTursoTables(client);
 
-    // Save hospitals in batch
+    // Save hospitals in batch (isolated to never block shifts)
     for (const h of hospitals) {
-      await client.execute({
-        sql: `
-          INSERT INTO hospitales (id, cliente_correo, nombre, nombre_corto, tipo_negocio, ciudad, color, gradiente_inicio, gradiente_fin, icono_badge, logo_url)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET
-            nombre = excluded.nombre,
-            nombre_corto = excluded.nombre_corto,
-            tipo_negocio = excluded.tipo_negocio,
-            ciudad = excluded.ciudad,
-            color = excluded.color,
-            gradiente_inicio = excluded.gradiente_inicio,
-            gradiente_fin = excluded.gradiente_fin,
-            icono_badge = excluded.icono_badge,
-            logo_url = excluded.logo_url
-        `,
-        args: [
-          h.id,
-          email,
-          h.name,
-          h.shortName,
-          h.businessType || null,
-          h.city,
-          h.color,
-          h.gradientStart,
-          h.gradientEnd,
-          h.badgeIcon,
-          h.logoUrl || null,
-        ],
-      });
+      try {
+        await client.execute({
+          sql: `
+            INSERT INTO hospitales (id, cliente_correo, nombre, nombre_corto, tipo_negocio, ciudad, color, gradiente_inicio, gradiente_fin, icono_badge, logo_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              nombre = excluded.nombre,
+              nombre_corto = excluded.nombre_corto,
+              tipo_negocio = excluded.tipo_negocio,
+              ciudad = excluded.ciudad,
+              color = excluded.color,
+              gradiente_inicio = excluded.gradiente_inicio,
+              gradiente_fin = excluded.gradiente_fin,
+              icono_badge = excluded.icono_badge,
+              logo_url = excluded.logo_url
+          `,
+          args: [
+            h.id,
+            email,
+            h.name,
+            h.shortName,
+            h.businessType || null,
+            h.city,
+            h.color,
+            h.gradientStart,
+            h.gradientEnd,
+            h.badgeIcon,
+            h.logoUrl || null,
+          ],
+        });
+      } catch (hErr) {
+        console.warn('Error saving hospital to Turso:', h.name, hErr);
+      }
     }
 
     // Save shifts
@@ -258,6 +269,20 @@ export async function syncLocalDataToTurso(
       });
     }
 
+    // Clean up any shifts deleted locally for this user
+    if (shifts.length > 0) {
+      const placeholders = shifts.map(() => '?').join(',');
+      await client.execute({
+        sql: `DELETE FROM turnos WHERE cliente_correo = ? AND id NOT IN (${placeholders})`,
+        args: [email, ...shifts.map((s) => s.id)],
+      });
+    } else {
+      await client.execute({
+        sql: `DELETE FROM turnos WHERE cliente_correo = ?`,
+        args: [email],
+      });
+    }
+
     return {
       success: true,
       message: `¡Sincronizado con Turso con éxito! Guardados ${shifts.length} turnos y ${hospitals.length} hospitales para ${email}.`,
@@ -270,6 +295,33 @@ export async function syncLocalDataToTurso(
       success: false,
       message: `Error al sincronizar con Turso: ${err.message || 'Error de conexión'}`,
     };
+  }
+}
+
+/**
+ * Fetches real-time counts from Turso database for verification
+ */
+export async function fetchTursoStats(
+  client: Client,
+  clienteCorreo: string
+): Promise<{ shiftsCount: number; hospitalsCount: number }> {
+  try {
+    const email = clienteCorreo.trim().toLowerCase();
+    const shiftsRes = await client.execute({
+      sql: `SELECT COUNT(*) as c FROM turnos WHERE cliente_correo = ?`,
+      args: [email],
+    });
+    const hospRes = await client.execute({
+      sql: `SELECT COUNT(*) as c FROM hospitales WHERE cliente_correo = ?`,
+      args: [email],
+    });
+    return {
+      shiftsCount: Number(shiftsRes.rows[0]?.c || 0),
+      hospitalsCount: Number(hospRes.rows[0]?.c || 0),
+    };
+  } catch (err) {
+    console.warn('Error fetching Turso stats:', err);
+    return { shiftsCount: 0, hospitalsCount: 0 };
   }
 }
 

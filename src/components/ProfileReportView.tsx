@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   User, Edit2, Mail, Phone, Award, ShieldCheck, Database,
-  Building2, Calendar, Clock, LogOut, CheckCircle2, MapPin
+  Building2, Calendar, Clock, LogOut, CheckCircle2, MapPin, RefreshCw
 } from 'lucide-react';
 import { UserSession, Hospital, MedicalShift } from '../types';
 
@@ -10,6 +10,7 @@ interface ProfileReportViewProps {
   hospitals: Hospital[];
   shifts: MedicalShift[];
   onOpenEditModal: () => void;
+  onManualSync?: () => Promise<void> | void;
   onLogout: () => void;
 }
 
@@ -18,11 +19,24 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
   hospitals,
   shifts,
   onOpenEditModal,
+  onManualSync,
   onLogout,
 }) => {
+  const [isSyncing, setIsSyncing] = useState(false);
+
   const activeShifts = shifts.filter((s) => s.shiftCode !== 'L');
   const totalHours = activeShifts.reduce((acc, s) => acc + (s.hours || 0), 0);
   const total24H = activeShifts.filter((s) => s.shiftCode === '24H' || (s.hours || 0) >= 24).length;
+
+  const handleSyncClick = async () => {
+    if (!onManualSync) return;
+    setIsSyncing(true);
+    try {
+      await onManualSync();
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-4xl mx-auto">
@@ -155,19 +169,38 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
         </div>
 
         {/* Database & Cloud status */}
-        <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-3 flex-wrap">
+        <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center shrink-0">
               <Database className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-200">Sincronización en la Nube (Turso)</p>
-              <p className="text-[11px] text-slate-400">Tus datos y foto se respaldan de manera segura en Turso SQLite.</p>
+              <p className="text-xs font-bold text-slate-200">
+                Base de Datos en la Nube (Turso LibSQL)
+              </p>
+              <p className="text-[11px] text-slate-400">
+                BD: <span className="font-mono text-teal-400">calendariomedico-rogerappfinanzas</span> ({user.email})
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-950/50 px-3 py-1 rounded-xl border border-emerald-800/40">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Sincronizado</span>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            {onManualSync && (
+              <button
+                onClick={handleSyncClick}
+                disabled={isSyncing}
+                className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-teal-900/40 transition-all active:scale-95 min-h-[38px]"
+                title="Forzar sincronización de turnos con Turso"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Ahora'}</span>
+              </button>
+            )}
+
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-950/50 px-3 py-1.5 rounded-xl border border-emerald-800/40 min-h-[38px]">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Conectado</span>
+            </div>
           </div>
         </div>
 
