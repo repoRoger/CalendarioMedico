@@ -35,12 +35,12 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
   const tomorrowDate = new Date(hnDate);
   tomorrowDate.setDate(hnDate.getDate() + 1);
 
-  const todayShifts = shifts.filter((s) => s.date === todayIso && s.shiftCode !== 'L');
-  const tomorrowShifts = shifts.filter((s) => s.date === tomorrowIso && s.shiftCode !== 'L');
+  const todayShifts = shifts.filter((s) => s.date === todayIso && s.title !== 'Día Libre / Descanso');
+  const tomorrowShifts = shifts.filter((s) => s.date === tomorrowIso && s.title !== 'Día Libre / Descanso');
 
   // Next upcoming shifts after tomorrow (up to 4)
   const futureShifts = shifts
-    .filter((s) => s.date > tomorrowIso && s.shiftCode !== 'L')
+    .filter((s) => s.date > tomorrowIso && s.title !== 'Día Libre / Descanso')
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 4);
 
@@ -55,6 +55,16 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
     switch (shift.shiftCode) {
       case '24H':
         return <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-lg text-xs font-bold">Guardia 24H</span>;
+      case 'TA-TB':
+      case 'D':
+        return <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-lg text-xs font-bold">TA-TB (16h)</span>;
+      case 'TB-TC':
+        return <span className="bg-violet-500/20 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1"><Moon className="w-3 h-3" /> TB-TC (16h)</span>;
+      case 'TC-TA':
+        return <span className="bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1"><Moon className="w-3 h-3" /> TC-TA (16h)</span>;
+      case 'LIBRE':
+      case 'L':
+        return <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-lg text-xs font-bold">Libre</span>;
       case 'TC':
       case 'N':
         return <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1"><Moon className="w-3 h-3" /> TC</span>;

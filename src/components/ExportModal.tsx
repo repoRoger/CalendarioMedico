@@ -29,7 +29,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
   const monthShifts = shifts
-    .filter((s) => s.date.startsWith(monthPrefix) && s.shiftCode !== 'L')
+    .filter((s) => s.date.startsWith(monthPrefix) && s.shiftCode !== 'L' && s.shiftCode !== 'LIBRE')
     .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
 
   const totalHours = monthShifts.reduce((acc, s) => acc + (s.hours || 0), 0);

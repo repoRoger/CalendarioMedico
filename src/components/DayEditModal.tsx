@@ -113,17 +113,20 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
     if (!activeShift) return;
     const target = { ...activeShift, ...updates };
 
-    if (updates.startTime !== undefined || updates.endTime !== undefined) {
+    if (target.shiftCode === 'LIBRE' || target.shiftCode === 'L') {
+      target.hours = 0;
+      target.isNightShift = false;
+    } else if (updates.startTime !== undefined || updates.endTime !== undefined) {
       target.hours = calculateShiftHours(target.startTime, target.endTime);
       const [sH] = target.startTime.split(':').map(Number);
       const [eH] = target.endTime.split(':').map(Number);
-      target.isNightShift = sH >= 20 || eH <= 8 || target.shiftCode === 'N' || target.shiftCode === '24H';
+      target.isNightShift = sH >= 20 || eH <= 8 || target.shiftCode === 'N' || target.shiftCode === '24H' || target.shiftCode === 'TB-TC' || target.shiftCode === 'TC-TA';
     }
 
     // Check duplicate schedule in real-time
     const duplicate = shifts.some((s, idx) => {
       if (editingIndex !== null && idx === editingIndex) return false;
-      if (s.shiftCode === 'L') return false;
+      if (s.shiftCode === 'L' || s.shiftCode === 'LIBRE' || target.shiftCode === 'LIBRE' || target.shiftCode === 'L') return false;
       return s.startTime === target.startTime && s.endTime === target.endTime;
     });
 
@@ -167,7 +170,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
     // Validate duplicate schedule before confirming
     const duplicate = shifts.find((s, idx) => {
       if (editingIndex !== null && idx === editingIndex) return false;
-      if (s.shiftCode === 'L') return false;
+      if (s.shiftCode === 'L' || s.shiftCode === 'LIBRE' || activeShift.shiftCode === 'LIBRE' || activeShift.shiftCode === 'L') return false;
       return s.startTime === activeShift.startTime && s.endTime === activeShift.endTime;
     });
 
@@ -187,8 +190,8 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
       // Update existing shift
       nextShifts = shifts.map((s, idx) => (idx === editingIndex ? finalShift : s));
     } else {
-      // Add new shift (remove any 'L' shift if adding a real shift)
-      const filtered = shifts.filter((s) => s.shiftCode !== 'L');
+      // Add new shift (remove generic day-off if adding a specific hospital shift)
+      const filtered = shifts.filter((s) => s.title !== 'Día Libre / Descanso');
       nextShifts = [...filtered, finalShift];
     }
 
@@ -230,7 +233,10 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
     onSaveDayShifts(date, nextShifts);
   };
 
-  const totalDayHours = shifts.reduce((acc, s) => acc + (s.hours || 0), 0);
+  const totalDayHours = shifts.reduce(
+    (acc, s) => (s.shiftCode === 'LIBRE' || s.shiftCode === 'L' ? acc : acc + (s.hours || 0)),
+    0
+  );
   const is24HourDay = totalDayHours >= 24;
 
   // Final confirmation to save the whole day
@@ -334,7 +340,8 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                   <div className="space-y-2.5">
                     {shifts.map((shift, idx) => {
                       const hosp = getHospitalForShift(shift, hospitals);
-                      const isLibre = shift.shiftCode === 'L';
+                      const isWholeDayOff = shift.shiftCode === 'L' && shift.title.toLowerCase().includes('libre');
+                      const isCenterLibre = shift.shiftCode === 'LIBRE' || (shift.shiftCode === 'L' && !isWholeDayOff);
 
                       return (
                         <div
@@ -346,25 +353,29 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                             <div
                               className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 font-bold text-xs shadow-md"
                               style={{
-                                background: isLibre
-                                  ? '#334155'
+                                background: isWholeDayOff
+                                  ? '#064e3b'
                                   : `linear-gradient(135deg, ${hosp?.gradientStart || '#0d9488'}, ${hosp?.gradientEnd || '#059669'})`,
                               }}
                             >
-                              {isLibre ? <Moon className="w-5 h-5 text-slate-300" /> : <Building2 className="w-5 h-5" />}
+                              {isWholeDayOff ? <Moon className="w-5 h-5 text-emerald-300" /> : <Building2 className="w-5 h-5" />}
                             </div>
 
                             <div className="min-w-0 space-y-0.5">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-extrabold text-sm text-slate-100 truncate">
-                                  {isLibre ? 'Día Libre' : (hosp?.shortName || hosp?.name || 'Centro')}
+                                  {isWholeDayOff ? 'Día Libre Completo' : (hosp?.shortName || hosp?.name || 'Centro')}
                                 </span>
 
-                                <span className="px-2 py-0.5 rounded-md bg-slate-800 text-teal-300 text-xs font-mono font-bold">
+                                <span className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold ${
+                                  isCenterLibre || isWholeDayOff
+                                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30'
+                                    : 'bg-slate-800 text-teal-300'
+                                }`}>
                                   {getShiftDisplayCode(shift.shiftCode)}: {getShiftDisplayName(shift.title || shift.shiftCode)}
                                 </span>
 
-                                {!isLibre && (
+                                {!isWholeDayOff && !isCenterLibre && (
                                   <span className="text-xs text-slate-400 font-mono">
                                     {shift.startTime} - {shift.endTime}
                                   </span>
@@ -372,7 +383,15 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                               </div>
 
                               <div className="flex items-center gap-2 text-xs text-slate-400 truncate">
-                                {!isLibre && (
+                                {isWholeDayOff ? (
+                                  <span className="text-emerald-400 font-semibold">
+                                    0h (Descanso de turnos)
+                                  </span>
+                                ) : isCenterLibre ? (
+                                  <span className="text-emerald-400 font-semibold">
+                                    0h laboradas (Libre en este centro)
+                                  </span>
+                                ) : (
                                   <span className="font-bold text-teal-400 font-mono">
                                     {shift.hours}h laboradas
                                   </span>

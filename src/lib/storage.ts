@@ -83,6 +83,39 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     isNightShift: true,
   },
   {
+    id: 'tpl-tatb',
+    code: 'TA-TB',
+    name: 'Mixto TA-TB',
+    defaultStartTime: '07:00',
+    defaultEndTime: '23:00',
+    defaultHours: 16,
+    description: 'Turno mixto Mañana + Tarde (16h)',
+    colorBadge: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+    isNightShift: false,
+  },
+  {
+    id: 'tpl-tbtc',
+    code: 'TB-TC',
+    name: 'Mixto TB-TC',
+    defaultStartTime: '15:00',
+    defaultEndTime: '07:00',
+    defaultHours: 16,
+    description: 'Turno mixto Tarde + Noche (16h)',
+    colorBadge: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+    isNightShift: true,
+  },
+  {
+    id: 'tpl-tcta',
+    code: 'TC-TA',
+    name: 'Mixto TC-TA',
+    defaultStartTime: '23:00',
+    defaultEndTime: '15:00',
+    defaultHours: 16,
+    description: 'Turno mixto Noche + Mañana (16h)',
+    colorBadge: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+    isNightShift: true,
+  },
+  {
     id: 'tpl-24h',
     code: '24H',
     name: 'Guardia 24H',
@@ -94,14 +127,14 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     isNightShift: true,
   },
   {
-    id: 'tpl-d',
-    code: 'D',
-    name: 'Doble Turno',
-    defaultStartTime: '07:00',
-    defaultEndTime: '23:00',
-    defaultHours: 16,
-    description: 'Turno extendido Mañana + Tarde (16h)',
-    colorBadge: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+    id: 'tpl-libre',
+    code: 'LIBRE',
+    name: 'Libre (Centro)',
+    defaultStartTime: '00:00',
+    defaultEndTime: '00:00',
+    defaultHours: 0,
+    description: 'Libre en este centro de trabajo (0h, no suma horas)',
+    colorBadge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     isNightShift: false,
   },
   {
@@ -113,17 +146,6 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultHours: 8,
     description: 'Reemplazo o cambio de turno cubriendo a un compañero/a',
     colorBadge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-    isNightShift: false,
-  },
-  {
-    id: 'tpl-l',
-    code: 'L',
-    name: 'Libre / Post-Turno',
-    defaultStartTime: '00:00',
-    defaultEndTime: '00:00',
-    defaultHours: 0,
-    description: 'Día de descanso reglamentario o compensatorio',
-    colorBadge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     isNightShift: false,
   },
 ];
@@ -328,7 +350,14 @@ export function getStoredTemplates(): ShiftTemplate[] {
       localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(DEFAULT_TEMPLATES));
       return DEFAULT_TEMPLATES;
     }
-    return JSON.parse(raw);
+    const parsed: ShiftTemplate[] = JSON.parse(raw);
+    const merged = [...parsed];
+    DEFAULT_TEMPLATES.forEach((dt) => {
+      if (!merged.some((m) => m.code === dt.code)) {
+        merged.push(dt);
+      }
+    });
+    return merged;
   } catch {
     return DEFAULT_TEMPLATES;
   }

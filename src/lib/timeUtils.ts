@@ -198,14 +198,21 @@ export function getShiftDisplayCode(code: string): string {
     case 'N':
     case 'TC':
       return 'TC';
+    case 'TA-TB':
+      return 'TA-TB';
+    case 'TB-TC':
+      return 'TB-TC';
+    case 'TC-TA':
+      return 'TC-TA';
     case '24H':
       return '24H';
+    case 'LIBRE':
+    case 'L':
+      return 'LIBRE';
     case 'D':
-      return 'D';
+      return 'TA-TB';
     case 'C':
       return 'C';
-    case 'L':
-      return 'L';
     default:
       return code || 'TA';
   }
@@ -217,8 +224,11 @@ export function getShiftDisplayName(codeOrTitle: string): string {
   if (upper === 'M' || upper === 'TA' || normalized.toLowerCase() === 'mañana') return 'TA';
   if (upper === 'T' || upper === 'TB' || normalized.toLowerCase() === 'tarde') return 'TB';
   if (upper === 'N' || upper === 'TC' || normalized.toLowerCase() === 'noche') return 'TC';
+  if (upper === 'TA-TB' || upper === 'TA - TB' || upper === 'D') return 'Mixto TA-TB';
+  if (upper === 'TB-TC' || upper === 'TB - TC') return 'Mixto TB-TC';
+  if (upper === 'TC-TA' || upper === 'TC - TA') return 'Mixto TC-TA';
   if (upper === '24H' || normalized.toLowerCase().includes('guardia 24')) return 'Guardia 24H';
-  if (upper === 'L' || normalized.toLowerCase() === 'libre') return 'Libre';
+  if (upper === 'LIBRE' || upper === 'L' || normalized.toLowerCase() === 'libre') return 'Libre';
   if (upper === 'C' || normalized.toLowerCase() === 'cubrir') return 'Cubrir';
   return normalized;
 }

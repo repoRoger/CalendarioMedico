@@ -26,7 +26,7 @@ export const StatsSummaryModal: React.FC<StatsSummaryModalProps> = ({
   if (!isOpen) return null;
 
   const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-  const monthShifts = shifts.filter((s) => s.date.startsWith(monthPrefix) && s.shiftCode !== 'L');
+  const monthShifts = shifts.filter((s) => s.date.startsWith(monthPrefix) && s.shiftCode !== 'L' && s.shiftCode !== 'LIBRE');
 
   const totalHours = monthShifts.reduce((acc, s) => acc + (s.hours || 0), 0);
   const totalShiftsCount = monthShifts.length;

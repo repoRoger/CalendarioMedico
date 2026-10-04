@@ -620,7 +620,7 @@ export default function App() {
 
   // Month stats for quick banner
   const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-  const currentMonthShifts = shifts.filter((s) => s.date.startsWith(monthPrefix) && s.shiftCode !== 'L');
+  const currentMonthShifts = shifts.filter((s) => s.date.startsWith(monthPrefix) && s.shiftCode !== 'L' && s.shiftCode !== 'LIBRE');
   const monthTotalHours = currentMonthShifts.reduce((acc, s) => acc + (s.hours || 0), 0);
 
   // 24H shifts count
