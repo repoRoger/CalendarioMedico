@@ -314,35 +314,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans pb-16 md:pb-6">
-      {/* Top Bar with Brand Dropdown (Calendario, Mis datos, Ajustes, Cerrar sesión) */}
+      {/* Top Bar: Shows user title & name (Lic. Roger Adan) and minimal actions */}
       <Header
-        currentYear={currentYear}
-        currentMonth={currentMonth}
-        currentView={currentView}
         user={user}
-        hospitals={hospitals}
-        onViewChange={(v) => {
-          setCurrentView(v);
-          setActiveSection('calendario');
-        }}
-        onPrevMonth={() => {
-          handlePrevMonth();
-          setActiveSection('calendario');
-        }}
-        onNextMonth={() => {
-          handleNextMonth();
-          setActiveSection('calendario');
-        }}
-        onToday={() => {
-          handleToday();
-          setActiveSection('calendario');
-        }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
-        onOpenTrabajos={() => setActiveSection('trabajos')}
-        onOpenSettings={(tab = 'templates') => {
-          setSettingsInitialTab(tab);
-          setIsSettingsModalOpen(true);
-        }}
         onOpenStats={() => setIsStatsModalOpen(true)}
         onOpenExport={() => setIsExportModalOpen(true)}
         onLogout={handleLogout}
@@ -383,9 +358,79 @@ export default function App() {
           />
         )}
 
-        {/* VIEW 2: CALENDARIO (Vista completa de mes) */}
+        {/* VIEW 3: CALENDARIO (Vista completa de mes con su propio selector de mes) */}
         {activeSection === 'calendario' && (
           <div className="space-y-3 sm:space-y-4">
+            {/* Dedicated Month Selector & View Mode Switcher for Calendar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl">
+              {/* Month / Year Navigator */}
+              <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-2xl p-1 self-start sm:self-auto shadow-inner">
+                <button
+                  onClick={handlePrevMonth}
+                  className="p-2 hover:bg-slate-800 text-slate-400 hover:text-slate-100 rounded-xl transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center active:scale-95"
+                  title="Mes anterior"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={handleToday}
+                  className="px-3 py-1.5 text-sm font-extrabold text-slate-100 hover:text-teal-300 transition-colors capitalize text-center min-w-[130px] sm:min-w-[160px] tracking-tight"
+                  title="Ir al mes actual (Hoy)"
+                >
+                  {SPANISH_MONTHS[currentMonth]} {currentYear}
+                </button>
+
+                <button
+                  onClick={handleNextMonth}
+                  className="p-2 hover:bg-slate-800 text-slate-400 hover:text-slate-100 rounded-xl transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center active:scale-95"
+                  title="Mes siguiente"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={handleToday}
+                  className="px-2.5 py-1 text-xs font-bold text-teal-400 hover:text-teal-300 bg-teal-950/60 border border-teal-800/40 rounded-xl hover:bg-teal-900/60 transition-colors ml-1"
+                >
+                  Hoy
+                </button>
+              </div>
+
+              {/* View mode switcher: Mes / Semana / Lista */}
+              <div className="flex items-center bg-slate-950 border border-slate-800 rounded-2xl p-1 self-start sm:self-auto">
+                <button
+                  onClick={() => setCurrentView('month')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    currentView === 'month'
+                      ? 'bg-teal-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Mes
+                </button>
+                <button
+                  onClick={() => setCurrentView('week')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    currentView === 'week'
+                      ? 'bg-teal-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Semana
+                </button>
+                <button
+                  onClick={() => setCurrentView('list')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    currentView === 'list'
+                      ? 'bg-teal-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Lista
+                </button>
+              </div>
+            </div>
             {/* Hospital Filter WrapPanel */}
             <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
               <div className="flex items-center justify-between text-xs">
@@ -518,9 +563,10 @@ export default function App() {
         )}
       </main>
 
-      {/* Unified 5-Item Bottom Navigation Bar (Trabajos, Calendario, Próximos, Mi perfil, Ajustes) */}
+      {/* Unified 5-Item Bottom Navigation Bar (Trabajos, Calendario, Próximos, Perfil, Ajustes) */}
       <AppBottomNav
         activeSection={activeSection}
+        user={user}
         onSelectSection={handleSelectSection}
       />
 

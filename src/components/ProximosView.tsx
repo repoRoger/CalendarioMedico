@@ -99,18 +99,23 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
         {/* CARD 1: HOY */}
         <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col justify-between space-y-4 relative overflow-hidden">
           <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-black uppercase tracking-wider">
-                  Hoy
-                </span>
-                <span className="text-xs font-bold text-slate-200">
-                  {formatHnDateDisplay(hnDate)}
-                </span>
-              </div>
-              <span className="text-[11px] font-mono text-teal-400 bg-teal-950/60 px-2 py-0.5 rounded-lg border border-teal-800/40">
-                {todayShifts.reduce((acc, s) => acc + (s.hours || 0), 0)}h hoy
+            {/* Header: HOY | Fecha Grande (flex-1) | Botón + */}
+            <div className="flex items-center justify-between gap-2.5 pb-3 border-b border-slate-800/80">
+              <span className="px-2.5 py-1 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-black uppercase tracking-wider shrink-0">
+                Hoy
               </span>
+
+              <span className="flex-1 font-extrabold text-sm sm:text-base text-slate-100 truncate px-1">
+                {formatHnDateDisplay(hnDate)}
+              </span>
+
+              <button
+                onClick={() => onEditDay(todayIso)}
+                className="w-9 h-9 rounded-xl bg-teal-600 hover:bg-teal-500 text-white flex items-center justify-center shadow-md shadow-teal-900/40 transition-transform active:scale-95 shrink-0"
+                title="Agregar o editar turno para hoy"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
             </div>
 
             {todayShifts.length > 0 ? (
@@ -171,46 +176,53 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
                 <Sun className="w-8 h-8 mx-auto text-amber-400/60" />
                 <p className="text-xs font-bold text-slate-200">Día Libre / Sin turno hoy</p>
                 <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                  No tienes ningún turno programado para hoy. ¡Aprovecha para descansar o programa uno si te llamaron!
+                  No tienes ningún turno programado para hoy. ¡Aprovecha para descansar o pulsa el botón (+) si te llamaron!
                 </p>
               </div>
             )}
           </div>
 
-          {/* Action button for Hoy */}
-          <button
-            onClick={() => onEditDay(todayIso)}
-            className="w-full min-h-[46px] py-2.5 px-4 bg-teal-600 hover:bg-teal-500 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-teal-900/30 transition-all active:scale-98"
-          >
-            {todayShifts.length > 0 ? (
-              <>
-                <Edit2 className="w-4 h-4" />
-                <span>Editar Turnos de Hoy</span>
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                <span>+ Agregar Turno para Hoy</span>
-              </>
+          {/* Bottom Footer: Horas totales del día y botón Editar */}
+          <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 font-medium">Total horas del día:</span>
+              <span className="font-extrabold text-xs sm:text-sm font-mono text-teal-300 bg-teal-950/70 border border-teal-800/50 px-2.5 py-0.5 rounded-lg">
+                {todayShifts.reduce((acc, s) => acc + (s.hours || 0), 0)}h
+              </span>
+            </div>
+
+            {todayShifts.length > 0 && (
+              <button
+                onClick={() => onEditDay(todayIso)}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-all active:scale-95"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-teal-400" />
+                <span>Editar turnos</span>
+              </button>
             )}
-          </button>
+          </div>
         </div>
 
         {/* CARD 2: MAÑANA */}
         <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col justify-between space-y-4 relative overflow-hidden">
           <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 text-xs font-black uppercase tracking-wider">
-                  Mañana
-                </span>
-                <span className="text-xs font-bold text-slate-200">
-                  {formatHnDateDisplay(tomorrowDate)}
-                </span>
-              </div>
-              <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800">
-                {tomorrowShifts.reduce((acc, s) => acc + (s.hours || 0), 0)}h mañana
+            {/* Header: MAÑANA | Fecha Grande (flex-1) | Botón + */}
+            <div className="flex items-center justify-between gap-2.5 pb-3 border-b border-slate-800/80">
+              <span className="px-2.5 py-1 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 text-xs font-black uppercase tracking-wider shrink-0">
+                Mañana
               </span>
+
+              <span className="flex-1 font-extrabold text-sm sm:text-base text-slate-100 truncate px-1">
+                {formatHnDateDisplay(tomorrowDate)}
+              </span>
+
+              <button
+                onClick={() => onEditDay(tomorrowIso)}
+                className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white flex items-center justify-center border border-slate-700 shadow-md transition-transform active:scale-95 shrink-0"
+                title="Agregar o editar turno para mañana"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
             </div>
 
             {tomorrowShifts.length > 0 ? (
@@ -271,29 +283,31 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
                 <Sun className="w-8 h-8 mx-auto text-slate-600" />
                 <p className="text-xs font-bold text-slate-200">Día Libre / Sin turno mañana</p>
                 <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                  Aún no tienes turnos asignados para mañana.
+                  Aún no tienes turnos asignados para mañana. Pulsa el botón (+) para programar uno.
                 </p>
               </div>
             )}
           </div>
 
-          {/* Action button for Mañana */}
-          <button
-            onClick={() => onEditDay(tomorrowIso)}
-            className="w-full min-h-[46px] py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 transition-all active:scale-98"
-          >
-            {tomorrowShifts.length > 0 ? (
-              <>
-                <Edit2 className="w-4 h-4" />
-                <span>Editar Turnos de Mañana</span>
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                <span>+ Agregar Turno para Mañana</span>
-              </>
+          {/* Bottom Footer: Horas totales del día y botón Editar */}
+          <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 font-medium">Total horas del día:</span>
+              <span className="font-extrabold text-xs sm:text-sm font-mono text-slate-300 bg-slate-950 border border-slate-800 px-2.5 py-0.5 rounded-lg">
+                {tomorrowShifts.reduce((acc, s) => acc + (s.hours || 0), 0)}h
+              </span>
+            </div>
+
+            {tomorrowShifts.length > 0 && (
+              <button
+                onClick={() => onEditDay(tomorrowIso)}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-all active:scale-95"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-teal-400" />
+                <span>Editar turnos</span>
+              </button>
             )}
-          </button>
+          </div>
         </div>
       </div>
 
