@@ -132,15 +132,15 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                   return (
                     <div
                       key={shift.id || idx}
-                      className="rounded-md px-1.5 py-0.5 text-white shadow-sm flex items-center justify-between text-[11px] leading-tight transition-transform hover:scale-[1.02]"
+                      className="rounded-md px-1 sm:px-1.5 py-0.5 text-white shadow-sm flex items-center justify-between text-[11px] leading-tight transition-transform hover:scale-[1.02]"
                       style={{
                         background: `linear-gradient(135deg, ${gradStart}, ${gradEnd})`,
                       }}
                       title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${shift.hours}h${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                     >
-                      <div className="flex items-center gap-1 min-w-0">
-                        {/* On mobile: 4 letters of workplace + shift code (e.g. "Bend TA") */}
-                        <span className="sm:hidden font-bold font-mono text-[9px] tracking-tight truncate">
+                      <div className="flex items-center gap-1 min-w-0 flex-1">
+                        {/* On mobile: ONLY "TA - Bend", no hours, clean and spacious */}
+                        <span className="sm:hidden font-black font-mono text-[9.5px] tracking-tight truncate w-full text-center sm:text-left">
                           {mobileLabel}
                         </span>
 
@@ -153,7 +153,8 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1 shrink-0 ml-1">
+                      {/* Notes and Time ONLY on tablet/desktop (hidden on mobile) */}
+                      <div className="hidden sm:flex items-center gap-1 shrink-0 ml-1">
                         {shift.notes && (
                           <span
                             className="text-[9px] bg-amber-400/30 text-amber-200 px-0.5 rounded leading-none"
@@ -162,7 +163,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                             📝
                           </span>
                         )}
-                        <span className="font-mono text-[9px] sm:text-[9.5px] opacity-90">
+                        <span className="font-mono text-[9.5px] opacity-90">
                           {shift.startTime.slice(0, 5)}
                         </span>
                       </div>

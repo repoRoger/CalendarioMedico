@@ -232,5 +232,5 @@ export function getShiftMobileLabel(workplaceName: string, shiftCode: string): s
   const cleanName = (workplaceName || 'Hosp').trim();
   const short4 = cleanName.slice(0, 4);
   const code = getShiftDisplayCode(shiftCode);
-  return `${short4} ${code}`;
+  return `${code} - ${short4}`;
 }
