@@ -182,20 +182,20 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
       finalShift.hospitalId = hospitals[0].id;
     }
 
+    let nextShifts: MedicalShift[];
     if (editingIndex !== null) {
       // Update existing shift
-      setShifts((prev) => {
-        const copy = [...prev];
-        copy[editingIndex] = finalShift;
-        return copy;
-      });
+      nextShifts = shifts.map((s, idx) => (idx === editingIndex ? finalShift : s));
     } else {
       // Add new shift (remove any 'L' shift if adding a real shift)
-      setShifts((prev) => {
-        const filtered = prev.filter((s) => s.shiftCode !== 'L');
-        return [...filtered, finalShift];
-      });
+      const filtered = shifts.filter((s) => s.shiftCode !== 'L');
+      nextShifts = [...filtered, finalShift];
     }
+
+    setShifts(nextShifts);
+
+    // DIRECT AUTO-PERSIST TO APP STATE & TURSO NUBE!
+    onSaveDayShifts(date, nextShifts);
 
     // Return to list view
     setModalMode('list');
@@ -204,12 +204,14 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
     setValidationError(null);
   };
 
-  // Delete a shift from the list
+  // Delete a shift from the list (auto-persists immediately)
   const handleRemoveShift = (index: number) => {
-    setShifts((prev) => prev.filter((_, i) => i !== index));
+    const nextShifts = shifts.filter((_, i) => i !== index);
+    setShifts(nextShifts);
+    onSaveDayShifts(date, nextShifts);
   };
 
-  // Set the whole day as off (Libre)
+  // Set the whole day as off (Libre) (auto-persists immediately)
   const handleSetDayOff = () => {
     const freeShift: MedicalShift = {
       id: `shift-${date}-${Date.now()}`,
@@ -223,7 +225,9 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
       department: 'Descanso post-turno',
       notes: 'Sin turnos programados',
     };
-    setShifts([freeShift]);
+    const nextShifts = [freeShift];
+    setShifts(nextShifts);
+    onSaveDayShifts(date, nextShifts);
   };
 
   const totalDayHours = shifts.reduce((acc, s) => acc + (s.hours || 0), 0);
@@ -615,7 +619,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                       className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-teal-900/40 transition-all active:scale-95 min-h-[42px]"
                     >
                       <Check className="w-4 h-4" />
-                      <span>{editingIndex !== null ? 'Guardar Turno' : 'Añadir Turno'}</span>
+                      <span>{editingIndex !== null ? 'Guardar Turno en Nube' : 'Añadir Turno en Nube'}</span>
                     </button>
                   </div>
                 </motion.div>
@@ -627,28 +631,24 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
         {/* Modal Footer in List Mode */}
         {modalMode === 'list' && (
           <div className="p-4 sm:p-5 border-t border-slate-800 flex items-center justify-between gap-3 bg-slate-950/70 shrink-0">
-            <span className="text-xs text-slate-400 font-mono">
-              Total día: <strong className="text-teal-400 font-bold">{totalDayHours}h</strong>
-            </span>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors min-h-[42px]"
-              >
-                Cancelar
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSaveWholeDay}
-                className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-teal-900/40 transition-all active:scale-95 min-h-[42px]"
-              >
-                <Check className="w-4 h-4" />
-                <span>Guardar y Cerrar</span>
-              </button>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-xs text-slate-400 font-mono">
+                Total día: <strong className="text-teal-400 font-bold">{totalDayHours}h</strong>
+              </span>
+              <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded-md flex items-center gap-1 font-semibold">
+                <Check className="w-3 h-3" />
+                Sincronizado
+              </span>
             </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-2 transition-all active:scale-95 min-h-[42px] border border-slate-700"
+            >
+              <Check className="w-4 h-4 text-teal-400" />
+              <span>Listo / Cerrar</span>
+            </button>
           </div>
         )}
       </motion.div>
