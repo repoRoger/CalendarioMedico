@@ -62,7 +62,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
             <div
               key={dayItem.date}
               onClick={() => onSelectDate(dayItem.date)}
-              className={`min-h-[110px] sm:min-h-[125px] p-1.5 sm:p-2 flex flex-col justify-between transition-all cursor-pointer relative group ${
+              className={`min-h-[125px] sm:min-h-[135px] p-1 sm:p-1.5 flex flex-col justify-between transition-all cursor-pointer relative group ${
                 !dayItem.isCurrentMonth
                   ? 'opacity-35 bg-slate-950/30'
                   : dayItem.isToday
@@ -118,54 +118,43 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                 </div>
               </div>
 
-              {/* Day Shifts Chips (supports 1, 2, 3 or more shifts!) */}
-              <div className="flex-1 space-y-1 overflow-hidden">
+              {/* Day Shifts Cards (supports 1, 2, 3 or more shifts!) */}
+              <div className="flex-1 space-y-1.5 overflow-hidden">
                 {dayShifts.slice(0, 3).map((shift, idx) => {
                   const hosp = getHospitalForShift(shift, hospitals);
-                  const gradStart = hosp?.gradientStart || '#0d9488';
+                  const gradStart = hosp?.gradientStart || hosp?.color || '#0d9488';
                   const gradEnd = hosp?.gradientEnd || '#059669';
 
                   const displayCode = getShiftDisplayCode(shift.shiftCode);
-                  const hospName = hosp?.shortName || hosp?.name || 'Centro';
-                  const mobileLabel = getShiftMobileLabel(hospName, shift.shiftCode);
+                  const hospShortName = hosp?.shortName || hosp?.name || 'Centro';
 
                   return (
                     <div
                       key={shift.id || idx}
-                      className="rounded-md px-1 sm:px-1.5 py-0.5 text-white shadow-sm flex items-center justify-between text-[11px] leading-tight transition-transform hover:scale-[1.02]"
+                      className="rounded-lg px-1.5 py-1 text-white shadow-md flex flex-col justify-center border border-white/20 transition-transform hover:scale-[1.02]"
                       style={{
                         background: `linear-gradient(135deg, ${gradStart}, ${gradEnd})`,
                       }}
                       title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${shift.hours}h${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                     >
-                      <div className="flex items-center gap-1 min-w-0 flex-1">
-                        {/* On mobile: ONLY "TA - Bend", no hours, clean and spacious */}
-                        <span className="sm:hidden font-black font-mono text-[9.5px] tracking-tight truncate w-full text-center sm:text-left">
-                          {mobileLabel}
+                      {/* Línea 1: TA - hora de inicio (e.g. TA - 07:00) */}
+                      <div className="flex items-center justify-between gap-1 leading-none font-mono">
+                        <span className="font-black text-[9.5px] sm:text-[10px] tracking-tight">
+                          {displayCode} - {shift.startTime.slice(0, 5)}
                         </span>
-
-                        {/* On tablet/desktop: badge with code and workplace full shortName */}
-                        <span className="hidden sm:inline-block font-bold font-mono text-[10px] bg-black/25 px-1 rounded shrink-0">
-                          {displayCode}
-                        </span>
-                        <span className="hidden sm:inline-block truncate font-medium text-[10.5px]">
-                          {hosp?.shortName || hosp?.name || shift.title}
-                        </span>
-                      </div>
-
-                      {/* Notes and Time ONLY on tablet/desktop (hidden on mobile) */}
-                      <div className="hidden sm:flex items-center gap-1 shrink-0 ml-1">
                         {shift.notes && (
                           <span
-                            className="text-[9px] bg-amber-400/30 text-amber-200 px-0.5 rounded leading-none"
+                            className="text-[8px] leading-none shrink-0"
                             title={`Nota: ${shift.notes}`}
                           >
                             📝
                           </span>
                         )}
-                        <span className="font-mono text-[9.5px] opacity-90">
-                          {shift.startTime.slice(0, 5)}
-                        </span>
+                      </div>
+
+                      {/* Línea 2: Nombre abreviado del centro de trabajo */}
+                      <div className="font-bold text-[9px] sm:text-[10px] leading-tight opacity-95 truncate mt-0.5">
+                        {hospShortName}
                       </div>
                     </div>
                   );
@@ -179,9 +168,9 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                 )}
               </div>
 
-              {/* Bottom hospital indicator dots when multiple */}
+              {/* Bottom hospital indicator dots on tablet/desktop */}
               {dayShifts.length > 1 && (
-                <div className="flex items-center gap-1 pt-1 justify-end">
+                <div className="hidden sm:flex items-center gap-1 pt-1 justify-end">
                   {dayShifts.map((s, i) => {
                     const h = getHospitalForShift(s, hospitals);
                     return (
