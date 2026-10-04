@@ -160,6 +160,40 @@ export async function fetchShiftsFromTurso(
 }
 
 /**
+ * Loads shift templates for a specific user from Turso.
+ */
+export async function fetchTemplatesFromTurso(
+  client: Client,
+  clienteCorreo: string
+): Promise<ShiftTemplate[]> {
+  try {
+    const result = await client.execute({
+      sql: `SELECT * FROM plantillas_turnos WHERE cliente_correo = ?`,
+      args: [clienteCorreo.trim().toLowerCase()],
+    });
+
+    if (result.rows.length === 0) {
+      return [];
+    }
+
+    return result.rows.map((row) => ({
+      id: String(row.id),
+      code: row.codigo as any,
+      name: String(row.nombre),
+      defaultStartTime: String(row.inicio_defecto),
+      defaultEndTime: String(row.fin_defecto),
+      defaultHours: Number(row.horas_defecto),
+      description: String(row.nombre),
+      colorBadge: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+      isNightShift: Boolean(row.es_nocturno),
+    }));
+  } catch (err) {
+    console.warn('Error fetching templates from Turso:', err);
+    return [];
+  }
+}
+
+/**
  * Loads hospitals for a specific user from Turso.
  */
 export async function fetchHospitalsFromTurso(
@@ -307,9 +341,42 @@ export async function syncLocalDataToTurso(
       });
     }
 
+    // Save templates for this user in Turso
+    if (templates && templates.length > 0) {
+      for (const t of templates) {
+        try {
+          await client.execute({
+            sql: `
+              INSERT INTO plantillas_turnos (id, cliente_correo, codigo, nombre, inicio_defecto, fin_defecto, horas_defecto, es_nocturno)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT(id) DO UPDATE SET
+                codigo = excluded.codigo,
+                nombre = excluded.nombre,
+                inicio_defecto = excluded.inicio_defecto,
+                fin_defecto = excluded.fin_defecto,
+                horas_defecto = excluded.horas_defecto,
+                es_nocturno = excluded.es_nocturno
+            `,
+            args: [
+              t.id || `tpl-${t.code.toLowerCase()}`,
+              email,
+              t.code,
+              t.name,
+              t.defaultStartTime,
+              t.defaultEndTime,
+              t.defaultHours,
+              t.isNightShift ? 1 : 0,
+            ],
+          });
+        } catch (tErr) {
+          console.warn('Error saving template to Turso:', t.code, tErr);
+        }
+      }
+    }
+
     return {
       success: true,
-      message: `¡Sincronizado con Turso con éxito! Guardados ${shifts.length} turnos y ${hospitals.length} hospitales para ${email}.`,
+      message: `¡Sincronizado con Turso con éxito! Guardados ${shifts.length} turnos, ${hospitals.length} hospitales y ${templates?.length || 0} plantillas para ${email}.`,
       syncedShiftsCount: shifts.length,
       syncedHospitalsCount: hospitals.length,
     };

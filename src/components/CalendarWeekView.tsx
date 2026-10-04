@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Plus, Clock, Moon, ShieldAlert, Building2, ChevronLeft, ChevronRight, Calendar
 } from 'lucide-react';
-import { CalendarDayItem, SPANISH_WEEKDAYS, formatFriendlyDate, SPANISH_MONTHS, getShiftDisplayCode } from '../lib/timeUtils';
+import { CalendarDayItem, SPANISH_WEEKDAYS, formatFriendlyDate, SPANISH_MONTHS, getShiftDisplayCode, isShiftLibre } from '../lib/timeUtils';
 import { MedicalShift, Hospital } from '../types';
 import { getHospitalForShift } from '../lib/storage';
 
@@ -109,9 +109,11 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
       {/* Week Grid (7 columns) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3">
         {days.map((dayItem, index) => {
-          const dayShifts = (shiftsByDate[dayItem.date] || []).filter((s) => s.shiftCode !== 'L');
-          const dayOffShift = (shiftsByDate[dayItem.date] || []).find((s) => s.shiftCode === 'L');
-          const totalHours = dayShifts.reduce((acc, s) => acc + (s.hours || 0), 0);
+          const allDayShifts = shiftsByDate[dayItem.date] || [];
+          const isWholeDayLibre = allDayShifts.length > 0 && allDayShifts.every((s) => s.shiftCode === 'L' || s.title.toLowerCase().includes('descanso') || s.title.toLowerCase().includes('libre total'));
+          const dayShifts = isWholeDayLibre ? [] : allDayShifts.filter((s) => s.title !== 'Día Libre / Descanso');
+          const dayOffShift = allDayShifts.find((s) => isShiftLibre(s.shiftCode));
+          const totalHours = dayShifts.reduce((acc, s) => (isShiftLibre(s.shiftCode) ? acc : acc + (s.hours || 0)), 0);
           const is24H = totalHours >= 24;
 
           return (
@@ -120,7 +122,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
               onClick={() => onSelectDate(dayItem.date)}
               className={`rounded-2xl p-3 border transition-all cursor-pointer flex flex-col justify-between min-h-[220px] ${
                 dayItem.isToday
-                  ? 'bg-teal-950/20 border-teal-500/40 ring-1 ring-teal-500/30'
+                  ? 'samsung-today-edge'
                   : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
               }`}
             >
@@ -184,7 +186,9 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                             <Clock className="w-3 h-3" />
                             {shift.startTime} - {shift.endTime}
                           </span>
-                          <span className="font-bold">{shift.hours}h</span>
+                          <span className="font-bold">
+                            {isShiftLibre(shift.shiftCode) ? '0h' : `${shift.hours}h`}
+                          </span>
                         </div>
 
                         {shift.notes && (

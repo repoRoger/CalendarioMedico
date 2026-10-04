@@ -1,6 +1,6 @@
 import React from 'react';
 import { Plus, Clock, Moon, Sparkles, Building2 } from 'lucide-react';
-import { CalendarDayItem, SPANISH_WEEKDAYS, getShiftDisplayCode, getShiftMobileLabel } from '../lib/timeUtils';
+import { CalendarDayItem, SPANISH_WEEKDAYS, getShiftDisplayCode, getShiftMobileLabel, isShiftLibre } from '../lib/timeUtils';
 import { MedicalShift, Hospital } from '../types';
 import { getHospitalForShift } from '../lib/storage';
 
@@ -53,8 +53,8 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
       <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-slate-800/60 bg-slate-950/40">
         {days.map((dayItem) => {
           const allDayShifts = shiftsByDate[dayItem.date] || [];
-          // A day is a full-day off if it has a shift with shiftCode 'L' / 'LIBRE' that was created as a full day off
-          const isWholeDayLibre = allDayShifts.length > 0 && allDayShifts.every((s) => s.shiftCode === 'L' || (s.shiftCode === 'LIBRE' && s.title.toLowerCase().includes('libre')));
+          // A day is a full-day off if it has a shift with shiftCode 'L' that was created as a full day off
+          const isWholeDayLibre = allDayShifts.length > 0 && allDayShifts.every((s) => s.shiftCode === 'L' || s.title.toLowerCase().includes('descanso') || s.title.toLowerCase().includes('libre total'));
           
           // Day shifts to display as cards
           const dayShifts = isWholeDayLibre
@@ -63,7 +63,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
 
           // Sum hours excluding any LIBRE shifts
           const totalHours = dayShifts.reduce(
-            (acc, s) => (s.shiftCode === 'LIBRE' || s.shiftCode === 'L' ? acc : acc + (s.hours || 0)),
+            (acc, s) => (isShiftLibre(s.shiftCode) ? acc : acc + (s.hours || 0)),
             0
           );
           const is24H = totalHours >= 24;
@@ -151,7 +151,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
 
                     const displayCode = getShiftDisplayCode(shift.shiftCode);
                     const hospShortName = hosp?.shortName || hosp?.name || 'Centro';
-                    const isLibreShift = shift.shiftCode === 'LIBRE' || shift.shiftCode === 'L';
+                    const isLibreShift = isShiftLibre(shift.shiftCode);
 
                     return (
                       <div

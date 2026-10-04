@@ -37,6 +37,7 @@ import { LedNotification, LedMessage } from './components/LedNotification';
 import {
   getTursoClient, syncLocalDataToTurso, saveUserProfileToTurso,
   fetchUserProfileFromTurso, fetchShiftsFromTurso, fetchHospitalsFromTurso,
+  fetchTemplatesFromTurso,
   mergeShifts, mergeHospitals, deleteHospitalFromTurso,
   loginUserWithPassword, registerUserWithPassword
 } from './lib/tursoClient';
@@ -142,8 +143,17 @@ export default function App() {
       setHospitals(finalHospitals);
       saveStoredHospitals(finalHospitals);
 
-      // 3. Keep Turso 100% updated with this consolidated authoritative dataset
-      await syncLocalDataToTurso(client, user.email, finalShifts, finalHospitals, templates);
+      // 3. TEMPLATES: Fetch remote templates for this user if available
+      const remoteTemplates = await fetchTemplatesFromTurso(client, user.email);
+      let finalTemplates = templates;
+      if (remoteTemplates && remoteTemplates.length > 0) {
+        finalTemplates = remoteTemplates;
+        setTemplates(finalTemplates);
+        saveStoredTemplates(finalTemplates);
+      }
+
+      // 4. Keep Turso 100% updated with this consolidated authoritative dataset
+      await syncLocalDataToTurso(client, user.email, finalShifts, finalHospitals, finalTemplates);
 
       if (!isSilent) {
         addNotification(
@@ -258,6 +268,26 @@ export default function App() {
       addNotification('success', 'Turno creado', `Se agregó ${savedTpl.name}`);
     }
     handleSaveTemplates(updated);
+  };
+
+  const handleDeleteTemplateFromModal = (templateId: string) => {
+    const target = templates.find((t) => t.id === templateId);
+    const updated = templates.filter((t) => t.id !== templateId);
+    setTemplates(updated);
+    saveStoredTemplates(updated);
+    addNotification('info', 'Turno eliminado', `Se eliminó "${target?.name || 'la plantilla'}"`);
+
+    if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
+      try {
+        const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+        client.execute({
+          sql: `DELETE FROM plantillas_turnos WHERE cliente_correo = ? AND id = ?`,
+          args: [user.email.trim().toLowerCase(), templateId],
+        }).catch(console.warn);
+      } catch (err) {
+        console.warn('Background Turso delete template error:', err);
+      }
+    }
   };
 
   // Google Login handler
@@ -964,6 +994,7 @@ export default function App() {
             setEditingTemplate(null);
           }}
           onSave={handleSaveTemplateFromModal}
+          onDelete={handleDeleteTemplateFromModal}
         />
       )}
 

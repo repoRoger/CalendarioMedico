@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { X, Clock, Save, Sparkles, Check } from 'lucide-react';
+import { X, Clock, Save, Sparkles, Check, Trash2 } from 'lucide-react';
 import { ShiftTemplate, ShiftCode } from '../types';
 import { calculateShiftHours } from '../lib/timeUtils';
 
@@ -9,15 +9,21 @@ interface TemplateModalProps {
   template: ShiftTemplate | null; // null for creating, ShiftTemplate for editing
   onClose: () => void;
   onSave: (template: ShiftTemplate) => void;
+  onDelete?: (templateId: string) => void;
 }
 
 const TEMPLATE_CODES: { code: ShiftCode; label: string; color: string }[] = [
-  { code: 'TA', label: 'TA · Mañana (07-15)', color: 'from-teal-600 to-emerald-500' },
-  { code: 'TB', label: 'TB · Tarde (15-23)', color: 'from-orange-600 to-amber-500' },
-  { code: 'TC', label: 'TC · Noche (23-07)', color: 'from-indigo-600 to-purple-600' },
-  { code: '24H', label: '24H · Guardia 24H', color: 'from-rose-600 to-red-600' },
-  { code: 'C', label: 'C · Cubrir', color: 'from-amber-600 to-yellow-600' },
-  { code: 'D', label: 'D · Doble', color: 'from-cyan-600 to-blue-600' },
+  { code: 'TA', label: 'TA (07-15, 8h)', color: 'from-teal-600 to-emerald-500' },
+  { code: 'TB', label: 'TB (15-21, 6h)', color: 'from-orange-600 to-amber-500' },
+  { code: 'TC', label: 'TC (21-07, 10h)', color: 'from-indigo-600 to-purple-600' },
+  { code: '24H', label: '24H (07-07, 24h)', color: 'from-rose-600 to-red-600' },
+  { code: 'TA-TB', label: 'TA-TB (14h)', color: 'from-purple-600 to-indigo-600' },
+  { code: 'TB-TC', label: 'TB-TC (16h)', color: 'from-violet-600 to-purple-700' },
+  { code: 'TC-TA', label: 'TC-TA (18h)', color: 'from-sky-600 to-blue-600' },
+  { code: 'LIBRE_A', label: 'Libre A (0h)', color: 'from-emerald-600 to-teal-600' },
+  { code: 'LIBRE_B', label: 'Libre B (0h)', color: 'from-emerald-600 to-teal-600' },
+  { code: 'LIBRE_C', label: 'Libre C (0h)', color: 'from-emerald-600 to-teal-600' },
+  { code: 'L', label: 'Libre total (0h)', color: 'from-emerald-700 to-green-700' },
   { code: 'CUSTOM', label: 'Personalizado', color: 'from-slate-700 to-slate-800' },
 ];
 
@@ -26,6 +32,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
   template,
   onClose,
   onSave,
+  onDelete,
 }) => {
   const isEditing = Boolean(template);
 
@@ -236,21 +243,40 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 min-h-[44px]"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white flex items-center gap-2 shadow-lg shadow-teal-900/40 min-h-[44px]"
-            >
-              <Save className="w-4 h-4" />
-              <span>Guardar Turno</span>
-            </button>
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800">
+            {isEditing && template && onDelete ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`¿Eliminar el turno "${template.name}"?`)) {
+                    onDelete(template.id);
+                    onClose();
+                  }
+                }}
+                className="px-3.5 py-2.5 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/15 border border-rose-500/30 flex items-center gap-1.5 transition-colors min-h-[44px]"
+                title="Eliminar este turno"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Eliminar</span>
+              </button>
+            ) : <div />}
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 min-h-[44px]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white flex items-center gap-2 shadow-lg shadow-teal-900/40 min-h-[44px]"
+              >
+                <Save className="w-4 h-4" />
+                <span>Guardar Turno</span>
+              </button>
+            </div>
           </div>
         </form>
       </motion.div>

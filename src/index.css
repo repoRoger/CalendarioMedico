@@ -23,16 +23,13 @@ nav[class*="fixed"] {
   -webkit-transform: translateZ(0);
 }
 
-/* Samsung S Edge Lighting subtle animated gradient border for Today */
-@keyframes samsung-edge-flow {
+/* Samsung S Edge Lighting fluid rotating border for Today */
+@keyframes edge-rotate {
   0% {
-    background-position: 0% 0%, 0% 50%;
-  }
-  50% {
-    background-position: 0% 0%, 100% 50%;
+    transform: rotate(0deg);
   }
   100% {
-    background-position: 0% 0%, 0% 50%;
+    transform: rotate(360deg);
   }
 }
 
@@ -40,11 +37,42 @@ nav[class*="fixed"] {
   position: relative !important;
   z-index: 10 !important;
   border-radius: 0.75rem !important;
-  background: 
-    linear-gradient(#080e22, #080e22) padding-box,
-    linear-gradient(135deg, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #10b981, #06b6d4) border-box !important;
-  border: 2px solid transparent !important;
-  background-size: 100% 100%, 300% 300% !important;
-  animation: samsung-edge-flow 9s ease infinite !important;
-  box-shadow: 0 0 16px rgba(6, 182, 212, 0.3) !important;
+  overflow: hidden !important;
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.35) !important;
+}
+
+.samsung-today-edge::before {
+  content: '';
+  position: absolute;
+  top: -60%;
+  left: -60%;
+  width: 220%;
+  height: 220%;
+  background: conic-gradient(
+    from 0deg,
+    #06b6d4 0deg,
+    #3b82f6 72deg,
+    #8b5cf6 144deg,
+    #ec4899 216deg,
+    #10b981 288deg,
+    #06b6d4 360deg
+  );
+  animation: edge-rotate 8s linear infinite !important;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.samsung-today-edge::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: #080e22;
+  border-radius: calc(0.75rem - 2px);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.samsung-today-edge > * {
+  position: relative;
+  z-index: 2;
 }

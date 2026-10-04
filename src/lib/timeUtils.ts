@@ -206,9 +206,16 @@ export function getShiftDisplayCode(code: string): string {
       return 'TC-TA';
     case '24H':
       return '24H';
+    case 'LIBRE_A':
+      return 'Libre A';
+    case 'LIBRE_B':
+      return 'Libre B';
+    case 'LIBRE_C':
+      return 'Libre C';
     case 'LIBRE':
+      return 'Libre';
     case 'L':
-      return 'LIBRE';
+      return 'Libre';
     case 'D':
       return 'TA-TB';
     case 'C':
@@ -216,6 +223,22 @@ export function getShiftDisplayCode(code: string): string {
     default:
       return code || 'TA';
   }
+}
+
+export function isShiftLibre(codeOrTitle: string): boolean {
+  if (!codeOrTitle) return false;
+  const upper = codeOrTitle.trim().toUpperCase();
+  return (
+    upper === 'L' ||
+    upper === 'LIBRE' ||
+    upper === 'LIBRE_A' ||
+    upper === 'LIBRE_B' ||
+    upper === 'LIBRE_C' ||
+    upper === 'LIBRE-A' ||
+    upper === 'LIBRE-B' ||
+    upper === 'LIBRE-C' ||
+    upper.startsWith('LIBRE')
+  );
 }
 
 export function getShiftDisplayName(codeOrTitle: string): string {
@@ -228,6 +251,9 @@ export function getShiftDisplayName(codeOrTitle: string): string {
   if (upper === 'TB-TC' || upper === 'TB - TC') return 'TB-TC';
   if (upper === 'TC-TA' || upper === 'TC - TA') return 'TC-TA';
   if (upper === '24H' || normalized.toLowerCase().includes('guardia 24')) return '24H';
+  if (upper === 'LIBRE_A' || upper === 'LIBRE-A' || normalized.toLowerCase() === 'libre a') return 'Libre A';
+  if (upper === 'LIBRE_B' || upper === 'LIBRE-B' || normalized.toLowerCase() === 'libre b') return 'Libre B';
+  if (upper === 'LIBRE_C' || upper === 'LIBRE-C' || normalized.toLowerCase() === 'libre c') return 'Libre C';
   if (upper === 'LIBRE') return 'Libre turno';
   if (upper === 'L' || normalized.toLowerCase() === 'libre') return 'Libre total';
   if (upper === 'C' || normalized.toLowerCase() === 'cubrir') return 'Cubrir';

@@ -144,11 +144,47 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
     if (code === 'L') {
       handleUpdateActiveShift({
         shiftCode: 'L',
-        title: 'Día Libre / Descanso',
+        title: 'Libre total',
         startTime: '00:00',
         endTime: '00:00',
         hours: 0,
         isNightShift: false,
+      });
+      return;
+    }
+
+    if (code === 'LIBRE_A') {
+      handleUpdateActiveShift({
+        shiftCode: 'LIBRE_A',
+        title: 'Libre A',
+        startTime: '07:00',
+        endTime: '15:00',
+        hours: 0,
+        isNightShift: false,
+      });
+      return;
+    }
+
+    if (code === 'LIBRE_B') {
+      handleUpdateActiveShift({
+        shiftCode: 'LIBRE_B',
+        title: 'Libre B',
+        startTime: '15:00',
+        endTime: '21:00',
+        hours: 0,
+        isNightShift: false,
+      });
+      return;
+    }
+
+    if (code === 'LIBRE_C') {
+      handleUpdateActiveShift({
+        shiftCode: 'LIBRE_C',
+        title: 'Libre C',
+        startTime: '21:00',
+        endTime: '07:00',
+        hours: 0,
+        isNightShift: true,
       });
       return;
     }
@@ -178,13 +214,14 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
     });
   };
 
-  // Adjust hours with +1h / -1h
-  const handleAdjustHoursActive = (deltaHours: number) => {
+  // Adjust start or end time with +1h / -1h
+  const handleAdjustTime = (field: 'startTime' | 'endTime', deltaHours: number) => {
     if (!activeShift) return;
-    const [h, m] = activeShift.endTime.split(':').map(Number);
+    const timeVal = activeShift[field] || (field === 'startTime' ? '07:00' : '15:00');
+    const [h, m] = timeVal.split(':').map(Number);
     let newH = (h + deltaHours + 24) % 24;
-    const newEnd = `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    handleUpdateActiveShift({ endTime: newEnd });
+    const newTime = `${String(newH).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+    handleUpdateActiveShift({ [field]: newTime });
   };
 
   // Save the currently edited shift back into the shifts array
@@ -521,15 +558,6 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                           </button>
                         );
                       })}
-
-                      <button
-                        type="button"
-                        onClick={onOpenHospitalManager}
-                        className="min-h-[44px] px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-teal-300 border border-dashed border-slate-700 shrink-0 flex items-center gap-1.5"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Nuevo Centro</span>
-                      </button>
                     </div>
                   </div>
 
@@ -538,7 +566,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                     <label className="block text-xs font-bold text-slate-300">
                       Horario Recomendado / Plantilla:
                     </label>
-                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
                       {templates.map((tpl) => (
                         <button
                           key={tpl.id}
@@ -556,38 +584,62 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 3. Ajuste de Horas Inicio y Fin */}
-                  <div className="grid grid-cols-2 gap-3 pt-1">
+                  {/* 3. Ajuste de Horas Inicio y Fin con Steppers para Móvil */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {/* Hora Inicio */}
                     <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
-                      <label className="block text-[11px] text-slate-400 uppercase font-bold mb-1">
-                        Hora Inicio
-                      </label>
-                      <input
-                        type="time"
-                        value={activeShift.startTime}
-                        onChange={(e) => handleUpdateActiveShift({ startTime: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-slate-100 min-h-[44px] focus:outline-none focus:border-teal-500"
-                      />
-                    </div>
-
-                    <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-[11px] text-slate-400 uppercase font-bold">
-                          Hora Fin
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[11px] text-slate-400 uppercase font-bold flex items-center gap-1.5">
+                          <Clock className="w-3 h-3 text-teal-400" />
+                          <span>Hora Inicio</span>
                         </label>
-                        <div className="flex gap-1">
+                        <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            onClick={() => handleAdjustHoursActive(-1)}
-                            className="text-[10px] px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 font-mono"
+                            onClick={() => handleAdjustTime('startTime', -1)}
+                            className="min-h-[32px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-mono font-bold border border-slate-700 active:scale-95"
                             title="-1 hora"
                           >
                             -1h
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleAdjustHoursActive(1)}
-                            className="text-[10px] px-1.5 py-0.5 bg-slate-800 text-teal-300 rounded hover:bg-slate-700 font-mono"
+                            onClick={() => handleAdjustTime('startTime', 1)}
+                            className="min-h-[32px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-teal-300 rounded-lg text-xs font-mono font-bold border border-slate-700 active:scale-95"
+                            title="+1 hora"
+                          >
+                            +1h
+                          </button>
+                        </div>
+                      </div>
+                      <input
+                        type="time"
+                        value={activeShift.startTime}
+                        onChange={(e) => handleUpdateActiveShift({ startTime: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-base font-mono font-bold text-slate-100 min-h-[46px] focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    {/* Hora Fin */}
+                    <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[11px] text-slate-400 uppercase font-bold flex items-center gap-1.5">
+                          <Clock className="w-3 h-3 text-teal-400" />
+                          <span>Hora Fin</span>
+                        </label>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustTime('endTime', -1)}
+                            className="min-h-[32px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-mono font-bold border border-slate-700 active:scale-95"
+                            title="-1 hora"
+                          >
+                            -1h
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustTime('endTime', 1)}
+                            className="min-h-[32px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-teal-300 rounded-lg text-xs font-mono font-bold border border-slate-700 active:scale-95"
                             title="+1 hora"
                           >
                             +1h
@@ -598,7 +650,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                         type="time"
                         value={activeShift.endTime}
                         onChange={(e) => handleUpdateActiveShift({ endTime: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-slate-100 min-h-[44px] focus:outline-none focus:border-teal-500"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-base font-mono font-bold text-slate-100 min-h-[46px] focus:outline-none focus:border-teal-500"
                       />
                     </div>
                   </div>
