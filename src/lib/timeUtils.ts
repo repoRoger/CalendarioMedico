@@ -101,9 +101,9 @@ export function getMonthMatrix(year: number, month: number): CalendarDayItem[] {
 
   const todayIso = getHondurasTodayIso();
 
-  // In standard calendar starting on Monday (or Sunday):
-  // Let's start on Monday (European / Latin American standard for nursing rosters: Lunes a Domingo)
-  const firstDayOfWeek = (firstDay.getDay() + 6) % 7; // 0 = Lunes, 6 = Domingo
+  // In standard Honduras & Latin America calendar starting on Sunday (Dom, Lun, Mar, Mié, Jue, Vie, Sáb)
+  // firstDay.getDay(): 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+  const firstDayOfWeek = firstDay.getDay();
   const totalDays = lastDay.getDate();
 
   const days: CalendarDayItem[] = [];
@@ -158,10 +158,10 @@ export function getMonthMatrix(year: number, month: number): CalendarDayItem[] {
 
 export function getWeekDays(currentDate: Date): CalendarDayItem[] {
   const date = new Date(currentDate);
-  const dayOfWeek = (date.getDay() + 6) % 7; // 0 = Lunes
-  date.setDate(date.getDate() - dayOfWeek); // Go to Monday
+  const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+  date.setDate(date.getDate() - dayOfWeek); // Go back to Sunday (Dom)
 
-  const todayIso = formatDateToIso(new Date());
+  const todayIso = getHondurasTodayIso();
   const days: CalendarDayItem[] = [];
 
   for (let i = 0; i < 7; i++) {
