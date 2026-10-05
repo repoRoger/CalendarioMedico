@@ -2,7 +2,10 @@ import React from 'react';
 import {
   Plus, Clock, Moon, ShieldAlert, Building2, ChevronLeft, ChevronRight, Calendar
 } from 'lucide-react';
-import { CalendarDayItem, SPANISH_WEEKDAYS, formatFriendlyDate, SPANISH_MONTHS, getShiftDisplayCode, isShiftLibre, isShiftCollision } from '../lib/timeUtils';
+import {
+  CalendarDayItem, SPANISH_WEEKDAYS, formatFriendlyDate, SPANISH_MONTHS,
+  getShiftDisplayCode, isShiftLibre, isShiftCollision, getContrastTextColor
+} from '../lib/timeUtils';
 import { MedicalShift, Hospital, ShiftTemplate } from '../types';
 import { getHospitalForShift, getShiftColor } from '../lib/storage';
 
@@ -171,45 +174,55 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                     const shiftColor = getShiftColor(shift.shiftCode, templates);
                     const isCollisionShift = isShiftCollision(shift.shiftCode) || shift.isCollision;
                     const isLibre = isShiftLibre(shift.shiftCode);
+                    const shiftTextColor = getContrastTextColor(shiftColor);
 
                     return (
                       <div
                         key={shift.id}
-                        className={`p-2 rounded-xl text-white text-xs shadow-md space-y-1 border ${
+                        className={`p-2.5 rounded-xl text-white text-xs shadow-md space-y-1 relative overflow-hidden bg-slate-900 border ${
                           isCollisionShift
-                            ? 'border-red-400 ring-1 ring-red-400 animate-pulse'
-                            : 'border-white/20'
-                        }`}
-                        style={{
-                          background: isCollisionShift
-                            ? 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)'
+                            ? 'border-red-500/80 ring-1 ring-red-500/60 bg-red-950/40'
                             : isLibre
-                            ? `linear-gradient(135deg, ${workplaceColor}44 0%, #064e3b99 100%)`
-                            : `linear-gradient(135deg, ${workplaceColor} 0%, ${shiftColor} 100%)`,
-                        }}
+                            ? 'border-emerald-500/40 bg-slate-900/90'
+                            : 'border-slate-800 hover:border-slate-700'
+                        }`}
                       >
-                        <div className="flex items-center justify-between gap-1 font-bold">
-                          <span className="truncate flex items-center gap-1">
-                            {hosp?.emoji && <span className="text-[11px] leading-none shrink-0">{hosp.emoji}</span>}
+                        {/* Barra lateral del centro */}
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-1.5"
+                          style={{
+                            backgroundColor: isCollisionShift ? '#ef4444' : workplaceColor,
+                          }}
+                        />
+
+                        <div className="flex items-center justify-between gap-1 pl-1">
+                          <span className="font-extrabold text-white text-xs truncate flex items-center gap-1">
+                            {hosp?.emoji && <span className="text-xs leading-none shrink-0">{hosp.emoji}</span>}
                             <span>{hosp?.shortName || hosp?.name || 'Centro'}</span>
                           </span>
-                          <span className="bg-black/25 px-1.5 py-0.5 rounded font-mono text-[10px]">
+                          <span
+                            className="px-1.5 py-0.5 rounded-md font-mono font-black text-[10px] shadow-sm border border-white/20"
+                            style={{
+                              backgroundColor: isCollisionShift ? '#dc2626' : isLibre ? '#059669' : shiftColor,
+                              color: isCollisionShift || isLibre ? '#ffffff' : shiftTextColor,
+                            }}
+                          >
                             {isCollisionShift ? '⚠️ CHOQUE' : getShiftDisplayCode(shift.shiftCode)}
                           </span>
                         </div>
 
-                        <div className="flex items-center justify-between text-[10.5px] opacity-90 font-mono">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
+                        <div className="flex items-center justify-between text-[10.5px] opacity-90 font-mono pl-1">
+                          <span className="flex items-center gap-1 text-slate-300">
+                            <Clock className="w-3 h-3 text-teal-400" />
                             {shift.startTime} - {shift.endTime}
                           </span>
-                          <span className="font-bold">
+                          <span className="font-bold text-teal-300">
                             {isLibre ? '0h' : `${shift.hours}h`}
                           </span>
                         </div>
 
                         {shift.notes && (
-                          <p className="text-[10px] text-amber-200 bg-black/25 px-1 py-0.5 rounded truncate italic">
+                          <p className="text-[10px] text-amber-200 bg-black/25 px-1 py-0.5 rounded truncate italic ml-1">
                             {shift.notes}
                           </p>
                         )}

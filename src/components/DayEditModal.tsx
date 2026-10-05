@@ -8,7 +8,8 @@ import {
 import { Hospital, MedicalShift, ShiftCode, ShiftTemplate } from '../types';
 import {
   calculateShiftHours, formatFriendlyDate, getShiftDisplayCode,
-  getShiftDisplayName, doShiftsOverlap, isShiftLibre, isShiftCollision
+  getShiftDisplayName, doShiftsOverlap, isShiftLibre, isShiftCollision,
+  getContrastTextColor
 } from '../lib/timeUtils';
 import { getHospitalForShift, getShiftColor } from '../lib/storage';
 
@@ -249,7 +250,6 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
   const handleSaveActiveShift = (forceAsCollision = false) => {
     if (!activeShift) return;
 
-    // Check overlap if not forced
     const conflict = checkOverlap(activeShift, editingIndex);
 
     let finalShift = { ...activeShift };
@@ -263,20 +263,15 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
 
     let nextShifts: MedicalShift[];
     if (editingIndex !== null) {
-      // Update existing shift
       nextShifts = shifts.map((s, idx) => (idx === editingIndex ? finalShift : s));
     } else {
-      // Add new shift (remove generic day-off if adding a specific hospital shift)
       const filtered = shifts.filter((s) => s.title !== 'Día Libre / Descanso');
       nextShifts = [...filtered, finalShift];
     }
 
     setShifts(nextShifts);
-
-    // DIRECT AUTO-PERSIST TO APP STATE & TURSO NUBE!
     onSaveDayShifts(date, nextShifts);
 
-    // Return to list view
     setModalMode('list');
     setEditingIndex(null);
     setActiveShift(null);
@@ -319,6 +314,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
   const currentHosp = activeShift ? getHospitalForShift(activeShift, hospitals) : null;
   const currentWorkplaceColor = currentHosp?.color || currentHosp?.gradientStart || '#0d9488';
   const currentShiftColor = activeShift ? getShiftColor(activeShift.shiftCode, templates) : '#f59e0b';
+  const currentShiftTextColor = getContrastTextColor(currentShiftColor);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
@@ -393,7 +389,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
         <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
           <AnimatePresence mode="wait">
             {modalMode === 'list' ? (
-              /* VIEW 1: LISTADO DE TURNOS DEL DÍA */
+              /* VIEW 1: LISTADO DE TURNOS DEL DÍA (Opción 1: Barra lateral + Nombre en blanco y negrita + Badge) */
               <motion.div
                 key="list-view"
                 initial={{ opacity: 0, x: -15 }}
@@ -421,28 +417,31 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                       const isCollision = isShiftCollision(shift.shiftCode) || shift.isCollision;
                       const workplaceColor = hosp?.color || hosp?.gradientStart || '#0d9488';
                       const shiftColor = getShiftColor(shift.shiftCode, templates);
+                      const shiftTextColor = getContrastTextColor(shiftColor);
 
                       return (
                         <div
                           key={shift.id || idx}
-                          className={`p-3.5 rounded-2xl bg-slate-950/80 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors group ${
+                          className={`p-3.5 pl-4 rounded-2xl bg-slate-950/90 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors group relative overflow-hidden shadow-md ${
                             isCollision
                               ? 'border-red-500/60 ring-1 ring-red-500/50'
                               : 'border-slate-800 hover:border-slate-700'
                           }`}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            {/* Hospital or Free icon badge with gradient fusion */}
+                          {/* Barra lateral sólida del centro */}
+                          <div
+                            className="absolute left-0 top-0 bottom-0 w-2 shadow-sm"
+                            style={{
+                              backgroundColor: isCollision ? '#ef4444' : workplaceColor,
+                            }}
+                          />
+
+                          <div className="flex items-center gap-3 min-w-0 pl-1">
+                            {/* Hospital badge cuadrado con emoji */}
                             <div
-                              className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shrink-0 font-bold text-base shadow-md border border-white/20"
+                              className="w-11 h-11 rounded-xl flex items-center justify-center text-white shrink-0 font-bold text-lg shadow-md"
                               style={{
-                                background: isCollision
-                                  ? 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)'
-                                  : isWholeDayOff
-                                  ? '#064e3b'
-                                  : isCenterLibre
-                                  ? `linear-gradient(135deg, ${workplaceColor} 0%, #059669 100%)`
-                                  : `linear-gradient(135deg, ${workplaceColor} 0%, ${shiftColor} 100%)`,
+                                backgroundColor: isWholeDayOff ? '#064e3b' : workplaceColor,
                               }}
                             >
                               {isWholeDayOff ? (
@@ -456,18 +455,19 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
 
                             <div className="min-w-0 space-y-0.5">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-extrabold text-sm text-slate-100 truncate">
-                                  {isWholeDayOff ? 'Día Libre Completo' : (hosp?.shortName || hosp?.name || 'Centro')}
+                                <span className="font-extrabold text-sm sm:text-base text-white truncate drop-shadow-sm">
+                                  {isWholeDayOff ? 'Día Libre Completo' : (hosp?.name || 'Centro de Trabajo')}
                                 </span>
 
                                 <span
-                                  className="px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold text-white shadow-sm border border-white/20"
+                                  className="px-2.5 py-0.5 rounded-lg text-xs font-mono font-black shadow-sm border border-white/20"
                                   style={{
                                     backgroundColor: isCollision
                                       ? '#dc2626'
                                       : isWholeDayOff || isCenterLibre
                                       ? '#059669'
                                       : shiftColor,
+                                    color: isCollision || isWholeDayOff || isCenterLibre ? '#ffffff' : shiftTextColor,
                                   }}
                                 >
                                   {getShiftDisplayCode(shift.shiftCode)}: {getShiftDisplayName(shift.title || shift.shiftCode)}
@@ -532,7 +532,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleOpenNewShift('TA')}
-                    className="flex-1 py-3 px-4 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-teal-900/30 transition-all active:scale-[0.98] min-h-[46px]"
+                    className="flex-1 py-3.5 px-4 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-teal-900/30 transition-all active:scale-[0.98] min-h-[46px]"
                   >
                     <Plus className="w-4 h-4" />
                     <span>+ Agregar Turno a este día</span>
@@ -541,7 +541,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                   <button
                     type="button"
                     onClick={handleSetDayOff}
-                    className="py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition-colors min-h-[46px]"
+                    className="py-3.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition-colors min-h-[46px]"
                   >
                     <Moon className="w-4 h-4 text-purple-400" />
                     <span>Marcar Día Libre</span>
@@ -619,6 +619,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                       {templates.map((tpl) => {
                         const isSelected = activeShift.shiftCode === tpl.code;
                         const shiftColor = getShiftColor(tpl.code, templates);
+                        const textColor = getContrastTextColor(shiftColor);
                         return (
                           <button
                             key={tpl.id}
@@ -626,11 +627,12 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                             onClick={() => handleApplyTemplateToActive(tpl.code)}
                             className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border ${
                               isSelected
-                                ? 'text-white border-white shadow-lg ring-2 ring-white scale-105 font-black'
+                                ? 'border-white shadow-lg ring-2 ring-white scale-105 font-black'
                                 : 'text-slate-400 bg-slate-950 border-slate-800 hover:text-slate-200'
                             }`}
                             style={{
                               backgroundColor: isSelected ? shiftColor : undefined,
+                              color: isSelected ? textColor : undefined,
                             }}
                           >
                             {tpl.name || tpl.code}
@@ -707,23 +709,36 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Summary card with live gradient fusion preview */}
-                  <div
-                    className="p-3.5 rounded-2xl text-white shadow-md border border-white/20 flex items-center justify-between"
-                    style={{
-                      background: `linear-gradient(135deg, ${currentWorkplaceColor} 0%, ${currentShiftColor} 100%)`,
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">{currentHosp?.emoji || '🏥'}</span>
+                  {/* Summary card Opción 1 preview */}
+                  <div className="p-3.5 pl-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between relative overflow-hidden shadow-sm">
+                    {/* Barra lateral */}
+                    <div
+                      className="absolute left-0 top-0 bottom-0 w-2"
+                      style={{ backgroundColor: currentWorkplaceColor }}
+                    />
+
+                    <div className="flex items-center gap-2.5 pl-1">
+                      <span className="text-xl">{currentHosp?.emoji || '🏥'}</span>
                       <div>
-                        <span className="font-bold text-xs block">{currentHosp?.shortName || 'Centro'} · {activeShift.shiftCode}</span>
-                        <span className="text-[10px] opacity-90">{activeShift.startTime} a {activeShift.endTime}</span>
+                        <span className="font-extrabold text-sm text-white block truncate">{currentHosp?.name || 'Centro'}</span>
+                        <span className="text-xs text-slate-400 font-mono">{activeShift.startTime} a {activeShift.endTime}</span>
                       </div>
                     </div>
-                    <span className="text-sm font-black font-mono bg-black/25 px-2.5 py-1 rounded-xl">
-                      {activeShift.hours} horas
-                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="px-2.5 py-1 rounded-lg text-xs font-black font-mono shadow-sm border border-white/20"
+                        style={{
+                          backgroundColor: currentShiftColor,
+                          color: currentShiftTextColor,
+                        }}
+                      >
+                        {activeShift.shiftCode}
+                      </span>
+                      <span className="text-sm font-black font-mono text-teal-400">
+                        {activeShift.hours}h
+                      </span>
+                    </div>
                   </div>
 
                   {/* 4. Departamento y Notas */}

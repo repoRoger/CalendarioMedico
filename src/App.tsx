@@ -11,11 +11,12 @@ import {
   getStoredTemplates, saveStoredTemplates,
   getStoredUser, saveStoredUser,
   getStoredTursoConfig, saveStoredTursoConfig,
-  DEFAULT_TEMPLATES
+  DEFAULT_TEMPLATES, getHospitalForShift
 } from './lib/storage';
 import {
   getMonthMatrix, getWeekDays, formatDateToIso, SPANISH_MONTHS,
-  getHondurasDate, getHondurasTodayIso, getHondurasTomorrowIso, isShiftLibre
+  getHondurasDate, getHondurasTodayIso, getHondurasTomorrowIso, isShiftLibre,
+  getShiftDisplayCode
 } from './lib/timeUtils';
 import { Header } from './components/Header';
 import { AppBottomNav, MainAppSection } from './components/AppBottomNav';
@@ -698,7 +699,12 @@ export default function App() {
       nextDayShifts = [...dayShifts, newShift];
     } else {
       // Toggle if exact same shift already on this date
-      const exactMatch = dayShifts.find((s) => s.hospitalId === hosp.id && s.shiftCode === tpl.code);
+      const exactMatch = dayShifts.find((s) => {
+        const sHosp = getHospitalForShift(s, hospitals);
+        const sCode = getShiftDisplayCode(s.shiftCode);
+        const tCode = getShiftDisplayCode(tpl.code);
+        return sHosp.id === hosp.id && sCode === tCode;
+      });
       if (exactMatch) {
         nextDayShifts = dayShifts.filter((s) => s.id !== exactMatch.id);
       } else {

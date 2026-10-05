@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Clock, Moon, Sparkles, Building2, Paintbrush, AlertTriangle, Check, RefreshCw, X, ShieldAlert } from 'lucide-react';
 import {
   CalendarDayItem, SPANISH_WEEKDAYS, getShiftDisplayCode, getShiftMobileLabel,
-  isShiftLibre, isShiftCollision, formatFriendlyDate, doShiftsOverlap
+  isShiftLibre, isShiftCollision, formatFriendlyDate, doShiftsOverlap, getContrastTextColor
 } from '../lib/timeUtils';
 import { MedicalShift, Hospital, ShiftTemplate, ShiftCode } from '../types';
 import { getHospitalForShift, getShiftColor } from '../lib/storage';
@@ -85,15 +85,22 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
     const newStartTime = targetTpl?.defaultStartTime || '07:00';
     const newEndTime = targetTpl?.defaultEndTime || '15:00';
     const newHours = targetTpl?.defaultHours || 8;
+    const normalizedTargetCode = getShiftDisplayCode(selectedTemplateCode);
 
     // 1. Check if exact same shift already exists on this day in same hospital
-    const exactMatch = allDayShifts.find((s) => s.hospitalId === selectedHospitalId && s.shiftCode === selectedTemplateCode);
+    // If it exists, this is a TOGGLE OFF (remove) action. We must NOT trigger collision with other shifts!
+    const exactMatch = allDayShifts.find((s) => {
+      const sHosp = getHospitalForShift(s, hospitals);
+      const sCode = getShiftDisplayCode(s.shiftCode);
+      return sHosp.id === targetHosp.id && sCode === normalizedTargetCode;
+    });
+
     if (exactMatch) {
-      // Toggle off / delete on tap
+      // Toggle off / delete this exact shift
       if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
         try { navigator.vibrate(20); } catch { /* ignore */ }
       }
-      onQuickAssignShift(dayItem.date, selectedHospitalId, selectedTemplateCode, 'create');
+      onQuickAssignShift(dayItem.date, targetHosp.id, selectedTemplateCode, 'create');
       return;
     }
 
@@ -107,6 +114,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
     };
 
     const conflictShift = allDayShifts.find((existing) => {
+      if (isShiftLibre(existing.shiftCode) && isShiftLibre(selectedTemplateCode)) return false;
       return doShiftsOverlap(newTimeSpan, {
         startTime: existing.startTime,
         endTime: existing.endTime,
@@ -120,8 +128,8 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
       const existingHosp = getHospitalForShift(conflictShift, hospitals);
       setCollisionDialog({
         date: dayItem.date,
-        newHospitalId: selectedHospitalId,
-        newHospitalName: targetHosp?.shortName || targetHosp?.name || 'Centro',
+        newHospitalId: targetHosp.id,
+        newHospitalName: targetHosp.shortName || targetHosp.name || 'Centro',
         newTemplateCode: selectedTemplateCode,
         newTime: `${newStartTime} - ${newEndTime}`,
         existingTitle: conflictShift.title || conflictShift.shiftCode,
@@ -140,7 +148,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
         // Ignore
       }
     }
-    onQuickAssignShift(dayItem.date, selectedHospitalId, selectedTemplateCode, 'create');
+    onQuickAssignShift(dayItem.date, targetHosp.id, selectedTemplateCode, 'create');
   };
 
   return (
@@ -211,6 +219,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
               {templates.map((tpl) => {
                 const isSel = selectedTemplateCode === tpl.code;
                 const shiftColor = getShiftColor(tpl.code, templates);
+                const textColor = getContrastTextColor(shiftColor);
                 return (
                   <button
                     key={tpl.id}
@@ -218,11 +227,12 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     onClick={() => setSelectedTemplateCode(tpl.code)}
                     className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all border ${
                       isSel
-                        ? 'text-white border-white shadow-lg ring-2 ring-white scale-105 font-black'
+                        ? 'border-white shadow-lg ring-2 ring-white scale-105 font-black'
                         : 'text-slate-300 bg-slate-900 border-slate-800 hover:text-white'
                     }`}
                     style={{
                       backgroundColor: isSel ? shiftColor : undefined,
+                      color: isSel ? textColor : undefined,
                     }}
                   >
                     {tpl.code === 'CHOQUE' ? '⚠️ Choque' : tpl.name || tpl.code}
@@ -232,28 +242,37 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
             </div>
           </div>
 
-          {/* Banner de Previsualización de Fusión de Colores */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-900/90 border border-amber-500/30 text-xs">
+          {/* Banner de Previsualización: Barra Lateral + Badge de Turno */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs">
             <div className="flex items-center gap-2.5 min-w-0">
-              {/* Tarjeta de previsualización con degradado de fusión */}
-              <div
-                className="px-3 py-1.5 rounded-xl text-white font-bold text-xs shadow-md border border-white/20 shrink-0"
-                style={{
-                  background: `linear-gradient(135deg, ${activeHospColor} 0%, ${activeShiftColor} 100%)`,
-                }}
-              >
-                <div className="flex items-center gap-1.5 font-mono">
-                  <span>{selectedTemplateCode}</span>
-                  <span className="text-[10px] font-sans font-normal opacity-90">{activeHosp?.emoji || '🏥'} {activeHosp?.shortName}</span>
-                </div>
+              {/* Tarjeta de previsualización Opción 1 */}
+              <div className="relative pl-3 pr-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center gap-2 shadow-sm overflow-hidden shrink-0">
+                {/* Barra lateral */}
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl"
+                  style={{ backgroundColor: activeHospColor }}
+                />
+                <span className="font-extrabold text-xs text-white flex items-center gap-1">
+                  {activeHosp?.emoji && <span>{activeHosp.emoji}</span>}
+                  <span>{activeHosp?.shortName || 'Centro'}</span>
+                </span>
+                <span
+                  className="px-2 py-0.5 rounded-md text-[10px] font-black font-mono shadow-sm border border-white/20"
+                  style={{
+                    backgroundColor: activeShiftColor,
+                    color: getContrastTextColor(activeShiftColor),
+                  }}
+                >
+                  {selectedTemplateCode}
+                </span>
               </div>
 
               <div className="min-w-0 leading-tight">
                 <p className="text-slate-200 font-bold">
-                  Toca cualquier día en el calendario para pintar este turno.
+                  Toca cualquier día para asignar o quitar este turno.
                 </p>
                 <p className="text-[11px] text-slate-400 truncate">
-                  Si no choca en horas con otro turno, se agrega automáticamente sumando horas.
+                  Si hay turnos en otro horario, se agregan sumando horas.
                 </p>
               </div>
             </div>
@@ -287,10 +306,9 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
       <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-slate-800/60 bg-slate-950/40">
         {days.map((dayItem) => {
           const allDayShifts = shiftsByDate[dayItem.date] || [];
-          // A day is a full-day off if it has a shift with shiftCode 'L' that was created as a full day off
           const isWholeDayLibre = allDayShifts.length > 0 && allDayShifts.every((s) => s.shiftCode === 'L' || s.title.toLowerCase().includes('descanso') || s.title.toLowerCase().includes('libre total'));
           
-          // Detect unresolved collision/conflict on this day using doShiftsOverlap
+          // Detect unresolved collision/conflict on this day
           const dayHasCollision = allDayShifts.some((s) => isShiftCollision(s.shiftCode) || s.isCollision) ||
             (allDayShifts.filter((s) => !isShiftLibre(s.shiftCode)).length >= 2 &&
              allDayShifts.filter((s) => !isShiftLibre(s.shiftCode)).some((a, i, arr) => arr.some((b, j) => i !== j && doShiftsOverlap(a, b))));
@@ -399,6 +417,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     const hosp = getHospitalForShift(shift, hospitals);
                     const workplaceColor = hosp?.color || hosp?.gradientStart || '#0d9488';
                     const shiftColor = getShiftColor(shift.shiftCode, templates);
+                    const shiftTextColor = getContrastTextColor(shiftColor);
 
                     const displayCode = getShiftDisplayCode(shift.shiftCode);
                     const hospShortName = hosp?.shortName || hosp?.name || 'Centro';
@@ -408,50 +427,49 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     return (
                       <div
                         key={shift.id || idx}
-                        className={`rounded-lg px-1.5 py-1 shadow-md flex flex-col justify-center border transition-transform hover:scale-[1.02] ${
+                        className={`rounded-lg py-1 pl-2 pr-1.5 shadow-md flex items-center justify-between gap-1 transition-all hover:scale-[1.02] relative overflow-hidden bg-slate-900 border ${
                           isCollisionShift
-                            ? 'border-red-400 ring-1 ring-red-400 text-white animate-pulse'
+                            ? 'border-red-500/80 ring-1 ring-red-500/60 bg-red-950/40'
                             : isLibreShift
-                            ? 'border-emerald-500/40 text-emerald-200'
-                            : 'border-white/20 text-white'
+                            ? 'border-emerald-500/40 bg-slate-900/90'
+                            : 'border-slate-800 hover:border-slate-700'
                         }`}
-                        style={{
-                          background: isCollisionShift
-                            ? 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)'
-                            : isLibreShift
-                            ? `linear-gradient(135deg, ${workplaceColor}44 0%, #064e3b99 100%)`
-                            : `linear-gradient(135deg, ${workplaceColor} 0%, ${shiftColor} 100%)`,
-                        }}
                         title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${isLibreShift ? '0h (Libre)' : `${shift.hours}h`}${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                       >
-                        {/* Línea 1: Turno grande y legible con indicador */}
-                        <div className="flex items-center justify-between gap-1 leading-none font-mono">
-                          <span className={`font-black text-[11.5px] sm:text-[13px] tracking-wide drop-shadow ${
-                            isCollisionShift ? 'text-white' : isLibreShift ? 'text-emerald-300' : 'text-white'
-                          }`}>
-                            {isCollisionShift ? '⚠️ CHOQUE' : displayCode}
+                        {/* Barra lateral izquierda del Centro de Trabajo */}
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-1 sm:w-1.5 shadow-sm"
+                          style={{
+                            backgroundColor: isCollisionShift ? '#ef4444' : workplaceColor,
+                          }}
+                        />
+
+                        {/* Izquierda: Emoji + Nombre del Centro en Blanco y Negrita */}
+                        <div className="flex items-center gap-1 min-w-0">
+                          {hosp?.emoji && (
+                            <span className="text-xs sm:text-sm leading-none shrink-0">
+                              {hosp.emoji}
+                            </span>
+                          )}
+                          <span className="font-extrabold text-[10.5px] sm:text-[11.5px] text-white tracking-tight truncate drop-shadow-sm">
+                            {hospShortName}
                           </span>
-                          {isLibreShift ? (
-                            <span className="text-[8px] font-sans font-bold bg-emerald-950/80 text-emerald-400 px-1 py-0.2 rounded border border-emerald-500/30">
-                              0h
-                            </span>
-                          ) : shift.notes ? (
-                            <span
-                              className="text-[8.5px] leading-none shrink-0"
-                              title={`Nota: ${shift.notes}`}
-                            >
-                              📝
-                            </span>
-                          ) : null}
                         </div>
 
-                        {/* Línea 2: Nombre abreviado del centro + Emoticono */}
-                        <div className={`font-bold text-[9px] sm:text-[9.5px] leading-tight truncate mt-0.5 flex items-center gap-1 ${
-                          isCollisionShift ? 'text-white font-black' : isLibreShift ? 'text-emerald-200/90' : 'text-white/95'
-                        }`}>
-                          {hosp?.emoji && <span className="text-[10px] leading-none shrink-0">{hosp.emoji}</span>}
-                          <span className="truncate">{hospShortName}</span>
-                        </div>
+                        {/* Derecha: Píldora del Turno */}
+                        <span
+                          className="px-1.5 py-0.5 rounded-md text-[9.5px] sm:text-[10px] font-black font-mono shadow-sm shrink-0 border border-white/20 leading-none flex items-center gap-0.5"
+                          style={{
+                            backgroundColor: isCollisionShift
+                              ? '#dc2626'
+                              : isLibreShift
+                              ? '#059669'
+                              : shiftColor,
+                            color: isCollisionShift || isLibreShift ? '#ffffff' : shiftTextColor,
+                          }}
+                        >
+                          {isCollisionShift ? '⚠️' : displayCode}
+                        </span>
                       </div>
                     );
                   })}

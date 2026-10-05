@@ -8,7 +8,7 @@ import { getHospitalForShift, getShiftColor } from '../lib/storage';
 import {
   getHondurasDate, getHondurasTodayIso, getHondurasTomorrowIso,
   SPANISH_MONTHS, SPANISH_WEEKDAYS_FULL, formatFriendlyDate,
-  getShiftDisplayCode, isShiftCollision, isShiftLibre
+  getShiftDisplayCode, isShiftCollision, isShiftLibre, getContrastTextColor
 } from '../lib/timeUtils';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -58,11 +58,12 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
     const isCollision = isShiftCollision(shift.shiftCode) || shift.isCollision;
     const isLibre = isShiftLibre(shift.shiftCode);
     const shiftColor = getShiftColor(shift.shiftCode, templates);
+    const textColor = getContrastTextColor(shiftColor);
 
     if (isCollision) {
       return (
-        <span className="bg-red-600 text-white border border-red-400 px-2.5 py-0.5 rounded-lg text-xs font-black flex items-center gap-1 animate-pulse shadow-sm">
-          <AlertTriangle className="w-3 h-3" />
+        <span className="bg-red-600 text-white border border-red-400 px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 animate-pulse shadow-sm">
+          <AlertTriangle className="w-3.5 h-3.5" />
           CHOQUE
         </span>
       );
@@ -70,7 +71,7 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
 
     if (isLibre) {
       return (
-        <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-lg text-xs font-bold shadow-sm">
+        <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-xs font-bold shadow-sm">
           Libre
         </span>
       );
@@ -78,9 +79,10 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
 
     return (
       <span
-        className="text-white px-2.5 py-0.5 rounded-lg text-xs font-bold shadow-sm border border-white/20 font-mono"
+        className="px-2.5 py-1 rounded-lg text-xs font-black shadow-sm border border-white/20 font-mono"
         style={{
           backgroundColor: shiftColor,
+          color: textColor,
         }}
       >
         {getShiftDisplayCode(shift.shiftCode)}
@@ -93,10 +95,7 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
       {/* Main Focus: Two Columns (HOY / MAÑANA) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* CARD 1: HOY */}
-        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-b from-slate-900 via-slate-900/95 to-teal-950/70 border border-slate-800 border-b-2 border-b-teal-500/60 shadow-xl shadow-teal-950/20 flex flex-col justify-between space-y-4 relative overflow-hidden">
-          {/* Sutil resplandor degradado en la parte inferior */}
-          <div className="absolute -bottom-10 -right-10 w-44 h-44 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
-
+        <div className="p-4 sm:p-5 rounded-3xl bg-slate-900 border border-slate-800 border-b-2 border-b-teal-500/60 shadow-xl shadow-teal-950/20 flex flex-col justify-between space-y-4 relative overflow-hidden">
           <div className="space-y-3 relative z-10">
             {/* Header: HOY | Fecha Grande (flex-1) | Botón + */}
             <div className="flex items-center justify-between gap-2.5 pb-3 border-b border-slate-800/80">
@@ -104,7 +103,7 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
                 Hoy
               </span>
 
-              <span className="flex-1 font-extrabold text-sm sm:text-base text-slate-100 truncate px-1">
+              <span className="flex-1 font-extrabold text-sm sm:text-base text-white truncate px-1">
                 {formatHnDateDisplay(hnDate)}
               </span>
 
@@ -122,56 +121,47 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
                 {todayShifts.map((shift, idx) => {
                   const hosp = getHospitalForShift(shift, hospitals);
                   const workplaceColor = hosp?.color || hosp?.gradientStart || '#0d9488';
-                  const shiftColor = getShiftColor(shift.shiftCode, templates);
                   const isCollision = isShiftCollision(shift.shiftCode) || shift.isCollision;
                   const isLibre = isShiftLibre(shift.shiftCode);
 
                   return (
                     <div
                       key={shift.id || idx}
-                      className={`p-3.5 rounded-2xl bg-slate-950/90 border space-y-2 relative overflow-hidden shadow-lg transition-all ${
+                      className={`p-3.5 pl-4 rounded-2xl bg-slate-950 border space-y-2 relative overflow-hidden shadow-lg transition-all ${
                         isCollision
                           ? 'border-red-500/60 ring-1 ring-red-500/50'
                           : 'border-slate-800/90 hover:border-slate-700'
                       }`}
                     >
-                      {/* Barra superior de fusión de colores */}
+                      {/* Barra lateral sólida del centro */}
                       <div
-                        className="absolute top-0 left-0 right-0 h-1"
+                        className="absolute left-0 top-0 bottom-0 w-2 shadow-sm"
                         style={{
-                          background: isCollision
-                            ? 'linear-gradient(90deg, #b91c1c, #ef4444)'
-                            : isLibre
-                            ? `linear-gradient(90deg, ${workplaceColor}, #10b981)`
-                            : `linear-gradient(90deg, ${workplaceColor}, ${shiftColor})`,
+                          backgroundColor: isCollision ? '#ef4444' : workplaceColor,
                         }}
                       />
 
-                      <div className="flex items-center justify-between gap-2 pt-1">
+                      <div className="flex items-center justify-between gap-2 pt-0.5">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          {/* Badge con degradado de fusión */}
+                          {/* Badge circular/cuadrado con color sólido del centro */}
                           <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-md font-black text-xs border border-white/20"
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-md font-bold text-lg"
                             style={{
-                              background: isCollision
-                                ? 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)'
-                                : isLibre
-                                ? `linear-gradient(135deg, ${workplaceColor} 0%, #059669 100%)`
-                                : `linear-gradient(135deg, ${workplaceColor} 0%, ${shiftColor} 100%)`,
+                              backgroundColor: workplaceColor,
                             }}
                           >
                             {hosp?.emoji ? (
-                              <span className="text-base">{hosp.emoji}</span>
+                              <span>{hosp.emoji}</span>
                             ) : (
                               <Building2 className="w-5 h-5" />
                             )}
                           </div>
 
                           <div className="min-w-0">
-                            <p className="font-bold text-sm text-slate-100 truncate">
+                            <p className="font-extrabold text-sm sm:text-base text-white truncate drop-shadow-sm">
                               {hosp?.name || 'Centro de Trabajo'}
                             </p>
-                            <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
+                            <p className="text-xs text-slate-400 truncate flex items-center gap-1">
                               <span>{hosp?.city || 'Honduras'}</span>
                               {shift.department && <span>· {shift.department}</span>}
                             </p>
@@ -181,7 +171,7 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
                       </div>
 
                       <div className="flex items-center justify-between pt-1 border-t border-slate-900 text-xs text-slate-300 font-mono">
-                        <span className="flex items-center gap-1.5">
+                        <span className="flex items-center gap-1.5 text-slate-300">
                           <Clock className="w-3.5 h-3.5 text-teal-400" />
                           {shift.startTime} - {shift.endTime}
                         </span>
@@ -235,10 +225,7 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
         </div>
 
         {/* CARD 2: MAÑANA */}
-        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-b from-slate-900 via-slate-900/95 to-indigo-950/70 border border-slate-800 border-b-2 border-b-indigo-500/60 shadow-xl shadow-indigo-950/20 flex flex-col justify-between space-y-4 relative overflow-hidden">
-          {/* Sutil resplandor degradado en la parte inferior */}
-          <div className="absolute -bottom-10 -right-10 w-44 h-44 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
+        <div className="p-4 sm:p-5 rounded-3xl bg-slate-900 border border-slate-800 border-b-2 border-b-indigo-500/60 shadow-xl shadow-indigo-950/20 flex flex-col justify-between space-y-4 relative overflow-hidden">
           <div className="space-y-3 relative z-10">
             {/* Header: MAÑANA | Fecha Grande (flex-1) | Botón + */}
             <div className="flex items-center justify-between gap-2.5 pb-3 border-b border-slate-800/80">
@@ -246,7 +233,7 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
                 Mañana
               </span>
 
-              <span className="flex-1 font-extrabold text-sm sm:text-base text-slate-100 truncate px-1">
+              <span className="flex-1 font-extrabold text-sm sm:text-base text-white truncate px-1">
                 {formatHnDateDisplay(tomorrowDate)}
               </span>
 
@@ -264,56 +251,47 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
                 {tomorrowShifts.map((shift, idx) => {
                   const hosp = getHospitalForShift(shift, hospitals);
                   const workplaceColor = hosp?.color || hosp?.gradientStart || '#0d9488';
-                  const shiftColor = getShiftColor(shift.shiftCode, templates);
                   const isCollision = isShiftCollision(shift.shiftCode) || shift.isCollision;
                   const isLibre = isShiftLibre(shift.shiftCode);
 
                   return (
                     <div
                       key={shift.id || idx}
-                      className={`p-3.5 rounded-2xl bg-slate-950/90 border space-y-2 relative overflow-hidden shadow-lg transition-all ${
+                      className={`p-3.5 pl-4 rounded-2xl bg-slate-950 border space-y-2 relative overflow-hidden shadow-lg transition-all ${
                         isCollision
                           ? 'border-red-500/60 ring-1 ring-red-500/50'
                           : 'border-slate-800/90 hover:border-slate-700'
                       }`}
                     >
-                      {/* Barra superior de fusión de colores */}
+                      {/* Barra lateral sólida del centro */}
                       <div
-                        className="absolute top-0 left-0 right-0 h-1"
+                        className="absolute left-0 top-0 bottom-0 w-2 shadow-sm"
                         style={{
-                          background: isCollision
-                            ? 'linear-gradient(90deg, #b91c1c, #ef4444)'
-                            : isLibre
-                            ? `linear-gradient(90deg, ${workplaceColor}, #10b981)`
-                            : `linear-gradient(90deg, ${workplaceColor}, ${shiftColor})`,
+                          backgroundColor: isCollision ? '#ef4444' : workplaceColor,
                         }}
                       />
 
-                      <div className="flex items-center justify-between gap-2 pt-1">
+                      <div className="flex items-center justify-between gap-2 pt-0.5">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          {/* Badge con degradado de fusión */}
+                          {/* Badge con color sólido del centro */}
                           <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-md font-black text-xs border border-white/20"
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-md font-bold text-lg"
                             style={{
-                              background: isCollision
-                                ? 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)'
-                                : isLibre
-                                ? `linear-gradient(135deg, ${workplaceColor} 0%, #059669 100%)`
-                                : `linear-gradient(135deg, ${workplaceColor} 0%, ${shiftColor} 100%)`,
+                              backgroundColor: workplaceColor,
                             }}
                           >
                             {hosp?.emoji ? (
-                              <span className="text-base">{hosp.emoji}</span>
+                              <span>{hosp.emoji}</span>
                             ) : (
                               <Building2 className="w-5 h-5" />
                             )}
                           </div>
 
                           <div className="min-w-0">
-                            <p className="font-bold text-sm text-slate-100 truncate">
+                            <p className="font-extrabold text-sm sm:text-base text-white truncate drop-shadow-sm">
                               {hosp?.name || 'Centro de Trabajo'}
                             </p>
-                            <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
+                            <p className="text-xs text-slate-400 truncate flex items-center gap-1">
                               <span>{hosp?.city || 'Honduras'}</span>
                               {shift.department && <span>· {shift.department}</span>}
                             </p>
@@ -323,7 +301,7 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
                       </div>
 
                       <div className="flex items-center justify-between pt-1 border-t border-slate-900 text-xs text-slate-300 font-mono">
-                        <span className="flex items-center gap-1.5">
+                        <span className="flex items-center gap-1.5 text-slate-300">
                           <Clock className="w-3.5 h-3.5 text-teal-400" />
                           {shift.startTime} - {shift.endTime}
                         </span>
@@ -377,7 +355,7 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
         </div>
       </div>
 
-      {/* Subsequent upcoming shifts preview with fusion bar */}
+      {/* Subsequent upcoming shifts preview with lateral workplace bar */}
       {futureShifts.length > 0 && (
         <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
           <div className="flex items-center justify-between">
@@ -398,31 +376,31 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
             {futureShifts.map((shift, idx) => {
               const hosp = getHospitalForShift(shift, hospitals);
               const workplaceColor = hosp?.color || hosp?.gradientStart || '#0d9488';
-              const shiftColor = getShiftColor(shift.shiftCode, templates);
               const isCollision = isShiftCollision(shift.shiftCode) || shift.isCollision;
 
               return (
                 <div
                   key={shift.id || idx}
                   onClick={() => onEditDay(shift.date)}
-                  className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 cursor-pointer flex items-center justify-between gap-2.5 transition-all active:scale-[0.99] min-h-[60px]"
+                  className="p-3 pl-3.5 rounded-2xl bg-slate-950/90 border border-slate-800/80 hover:border-slate-700 cursor-pointer flex items-center justify-between gap-2.5 transition-all active:scale-[0.99] min-h-[60px] relative overflow-hidden shadow-md"
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className="w-2.5 h-10 rounded-full shrink-0 shadow-sm"
-                      style={{
-                        background: isCollision
-                          ? '#ef4444'
-                          : `linear-gradient(180deg, ${workplaceColor}, ${shiftColor})`,
-                      }}
-                    />
+                  {/* Barra lateral del centro */}
+                  <div
+                    className="absolute left-0 top-0 bottom-0 w-1.5 shadow-sm"
+                    style={{
+                      backgroundColor: isCollision ? '#ef4444' : workplaceColor,
+                    }}
+                  />
+
+                  <div className="flex items-center gap-2.5 min-w-0 pl-1">
                     <div className="min-w-0">
-                      <p className="font-bold text-xs text-slate-200 truncate">
+                      <p className="font-extrabold text-xs text-white truncate">
                         {formatFriendlyDate(shift.date).split(',')[0]} · {shift.date.split('-').slice(1).reverse().join('/')}
                       </p>
-                      <p className="text-[11px] text-slate-400 truncate">
-                        {hosp?.emoji && <span className="mr-1">{hosp.emoji}</span>}
-                        {hosp?.shortName || 'Centro'} · {shift.startTime}-{shift.endTime} ({shift.hours}h)
+                      <p className="text-[11px] text-slate-300 font-semibold truncate flex items-center gap-1">
+                        {hosp?.emoji && <span>{hosp.emoji}</span>}
+                        <span className="text-white font-bold">{hosp?.shortName || 'Centro'}</span>
+                        <span className="text-slate-400 font-mono">· {shift.startTime}-{shift.endTime} ({shift.hours}h)</span>
                       </p>
                     </div>
                   </div>
