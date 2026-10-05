@@ -94,39 +94,6 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     isNightShift: true,
   },
   {
-    id: 'tpl-tatb',
-    code: 'TA-TB',
-    name: 'TA-TB',
-    defaultStartTime: '07:00',
-    defaultEndTime: '21:00',
-    defaultHours: 14,
-    description: 'Turno mixto TA-TB (07:00 - 21:00, 14h)',
-    colorBadge: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-    isNightShift: false,
-  },
-  {
-    id: 'tpl-tbtc',
-    code: 'TB-TC',
-    name: 'TB-TC',
-    defaultStartTime: '15:00',
-    defaultEndTime: '07:00',
-    defaultHours: 16,
-    description: 'Turno mixto TB-TC (15:00 - 07:00, 16h)',
-    colorBadge: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
-    isNightShift: true,
-  },
-  {
-    id: 'tpl-tcta',
-    code: 'TC-TA',
-    name: 'TC-TA',
-    defaultStartTime: '21:00',
-    defaultEndTime: '15:00',
-    defaultHours: 18,
-    description: 'Turno mixto TC-TA (21:00 - 15:00, 18h)',
-    colorBadge: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
-    isNightShift: true,
-  },
-  {
     id: 'tpl-libre-a',
     code: 'LIBRE_A',
     name: 'Libre A',
@@ -160,6 +127,17 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     isNightShift: true,
   },
   {
+    id: 'tpl-libre-turno',
+    code: 'LIBRE',
+    name: 'Libre turno',
+    defaultStartTime: '00:00',
+    defaultEndTime: '00:00',
+    defaultHours: 0,
+    description: 'Libre en este centro de trabajo (0h, no suma horas)',
+    colorBadge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    isNightShift: false,
+  },
+  {
     id: 'tpl-libre-total',
     code: 'L',
     name: 'Libre total',
@@ -169,6 +147,39 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     description: 'Día completo de descanso (0h)',
     colorBadge: 'bg-emerald-600/20 text-emerald-200 border-emerald-500/40',
     isNightShift: false,
+  },
+  {
+    id: 'tpl-tatb',
+    code: 'TA-TB',
+    name: 'TA-TB',
+    defaultStartTime: '07:00',
+    defaultEndTime: '21:00',
+    defaultHours: 14,
+    description: 'Turno mixto TA-TB (07:00 - 21:00, 14h)',
+    colorBadge: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+    isNightShift: false,
+  },
+  {
+    id: 'tpl-tbtc',
+    code: 'TB-TC',
+    name: 'TB-TC',
+    defaultStartTime: '15:00',
+    defaultEndTime: '07:00',
+    defaultHours: 16,
+    description: 'Turno mixto TB-TC (15:00 - 07:00, 16h)',
+    colorBadge: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+    isNightShift: true,
+  },
+  {
+    id: 'tpl-tcta',
+    code: 'TC-TA',
+    name: 'TC-TA',
+    defaultStartTime: '21:00',
+    defaultEndTime: '15:00',
+    defaultHours: 18,
+    description: 'Turno mixto TC-TA (21:00 - 15:00, 18h)',
+    colorBadge: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+    isNightShift: true,
   },
 ];
 
@@ -376,8 +387,12 @@ export function getStoredTemplates(): ShiftTemplate[] {
     // Filter out legacy duplicates (M, T, N, D)
     const cleaned = parsed.filter((t) => !['M', 'T', 'N', 'D'].includes(t.code));
 
-    // Order: Básicos (TA, TB, TC, 24H), Mixtos (TA-TB, TB-TC, TC-TA), Libres (LIBRE_A, LIBRE_B, LIBRE_C, L)
-    const orderedCodes: ShiftCode[] = ['TA', 'TB', 'TC', '24H', 'TA-TB', 'TB-TC', 'TC-TA', 'LIBRE_A', 'LIBRE_B', 'LIBRE_C', 'L'];
+    // Sequence: Básicos (TA, TB, TC, 24H), Libres (LIBRE_A, LIBRE_B, LIBRE_C, LIBRE, L), Mixtos (TA-TB, TB-TC, TC-TA)
+    const orderedCodes: ShiftCode[] = [
+      'TA', 'TB', 'TC', '24H',
+      'LIBRE_A', 'LIBRE_B', 'LIBRE_C', 'LIBRE', 'L',
+      'TA-TB', 'TB-TC', 'TC-TA',
+    ];
 
     const result: ShiftTemplate[] = [];
     orderedCodes.forEach((code) => {

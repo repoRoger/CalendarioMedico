@@ -4,13 +4,14 @@ import {
   Share2, ChevronLeft, ChevronRight, Moon, Sun, Sparkles, AlertTriangle,
   ShieldCheck, Filter, RefreshCw, Settings, LogOut
 } from 'lucide-react';
-import { Hospital, MedicalShift, ShiftTemplate, UserSession, TursoConfig } from './types';
+import { Hospital, MedicalShift, ShiftTemplate, ShiftCode, UserSession, TursoConfig } from './types';
 import {
   getStoredHospitals, saveStoredHospitals,
   getStoredShifts, saveStoredShifts,
   getStoredTemplates, saveStoredTemplates,
   getStoredUser, saveStoredUser,
-  getStoredTursoConfig, saveStoredTursoConfig
+  getStoredTursoConfig, saveStoredTursoConfig,
+  DEFAULT_TEMPLATES
 } from './lib/storage';
 import {
   getMonthMatrix, getWeekDays, formatDateToIso, SPANISH_MONTHS,
@@ -147,7 +148,22 @@ export default function App() {
       const remoteTemplates = await fetchTemplatesFromTurso(client, user.email);
       let finalTemplates = templates;
       if (remoteTemplates && remoteTemplates.length > 0) {
-        finalTemplates = remoteTemplates;
+        const orderedCodes: ShiftCode[] = [
+          'TA', 'TB', 'TC', '24H',
+          'LIBRE_A', 'LIBRE_B', 'LIBRE_C', 'LIBRE', 'L',
+          'TA-TB', 'TB-TC', 'TC-TA',
+        ];
+        const sorted: ShiftTemplate[] = [];
+        orderedCodes.forEach((code) => {
+          const t = remoteTemplates.find((rt) => rt.code === code) || DEFAULT_TEMPLATES.find((dt) => dt.code === code);
+          if (t) sorted.push(t);
+        });
+        remoteTemplates.forEach((rt) => {
+          if (!orderedCodes.includes(rt.code) && !sorted.some((s) => s.id === rt.id)) {
+            sorted.push(rt);
+          }
+        });
+        finalTemplates = sorted;
         setTemplates(finalTemplates);
         saveStoredTemplates(finalTemplates);
       }
