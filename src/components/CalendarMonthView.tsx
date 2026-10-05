@@ -274,14 +274,14 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs">
             <div className="flex items-center gap-2.5 min-w-0">
               {/* Tarjeta de previsualización 2 filas */}
-              <div className="relative pl-3 pr-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-center gap-0.5 shadow-sm overflow-hidden shrink-0 min-w-[110px]">
+              <div className="relative pl-3 pr-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-center gap-0.5 shadow-sm overflow-hidden shrink-0 min-w-[90px]">
                 {/* Barra lateral */}
                 <div
                   className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl"
                   style={{ backgroundColor: activeHospColor }}
                 />
                 {/* Fila 1: Turno */}
-                <div className="flex items-center justify-between gap-1 leading-none pl-0.5">
+                <div className="flex items-center justify-start leading-none pl-0.5">
                   <span
                     className="px-1.5 py-0.5 rounded text-[10px] font-black font-mono shadow-sm border border-white/20"
                     style={{
@@ -291,14 +291,10 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                   >
                     {selectedTemplateCode}
                   </span>
-                  <span className="text-[9.5px] font-mono text-slate-400">
-                    {activeTpl?.defaultHours || 8}h
-                  </span>
                 </div>
-                {/* Fila 2: Centro */}
-                <div className="flex items-center gap-1 min-w-0 leading-tight pl-0.5">
-                  {activeHosp?.emoji && <span className="text-xs leading-none shrink-0">{activeHosp.emoji}</span>}
-                  <span className="font-extrabold text-[11px] text-white tracking-tight truncate drop-shadow-sm">
+                {/* Fila 2: Centro (sin emoji) */}
+                <div className="min-w-0 leading-tight pl-0.5">
+                  <span className="font-extrabold text-[11px] text-white tracking-tight truncate block drop-shadow-sm">
                     {activeHosp?.shortName || 'Centro'}
                   </span>
                 </div>
@@ -482,8 +478,8 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                           }}
                         />
 
-                        {/* Fila 1 (Arriba): Nombre y Color del Turno (+ horas) */}
-                        <div className="flex items-center justify-between gap-1 leading-none pl-0.5">
+                        {/* Fila 1 (Arriba): Nombre y Color del Turno */}
+                        <div className="flex items-center justify-start leading-none pl-0.5">
                           <span
                             className="px-1.5 py-0.5 rounded text-[9.5px] sm:text-[10px] font-black font-mono shadow-sm shrink-0 border border-white/20 leading-none flex items-center gap-0.5"
                             style={{
@@ -495,24 +491,13 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                               color: isCollisionShift || isLibreShift ? '#ffffff' : shiftTextColor,
                             }}
                           >
-                            {isCollisionShift ? '⚠️' : displayCode}
+                            {isCollisionShift ? '⚠️ Choque' : displayCode}
                           </span>
-
-                          {!isLibreShift && (
-                            <span className="text-[9px] font-mono font-medium text-slate-400">
-                              {shift.hours}h
-                            </span>
-                          )}
                         </div>
 
-                        {/* Fila 2 (Abajo): Nombre abreviado del centro (sin color extra, sobre el fondo oscuro) */}
-                        <div className="flex items-center gap-1 min-w-0 leading-tight pl-0.5">
-                          {hosp?.emoji && (
-                            <span className="text-[10px] sm:text-xs leading-none shrink-0">
-                              {hosp.emoji}
-                            </span>
-                          )}
-                          <span className="font-extrabold text-[10px] sm:text-[11px] text-white tracking-tight truncate drop-shadow-sm">
+                        {/* Fila 2 (Abajo): Nombre abreviado del centro (sin emoji ni color extra, sobre fondo oscuro) */}
+                        <div className="min-w-0 leading-tight pl-0.5">
+                          <span className="font-extrabold text-[10.5px] sm:text-[11.5px] text-white tracking-tight truncate block drop-shadow-sm">
                             {hospShortName}
                           </span>
                         </div>
