@@ -18,7 +18,8 @@ interface CalendarMonthViewProps {
     date: string,
     hospitalId: string,
     templateCode: ShiftCode,
-    resolution: 'create' | 'replace' | 'keep_both' | 'mark_collision'
+    resolution: 'create' | 'replace' | 'keep_both' | 'mark_collision',
+    department?: string
   ) => void;
 }
 
@@ -46,6 +47,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
   const [isQuickMode, setIsQuickMode] = useState(false);
   const [selectedHospitalId, setSelectedHospitalId] = useState<string>(() => hospitals[0]?.id || 'hosp-bendana');
   const [selectedTemplateCode, setSelectedTemplateCode] = useState<ShiftCode>('TA');
+  const [quickDepartment, setQuickDepartment] = useState('');
   const [collisionDialog, setCollisionDialog] = useState<CollisionDialogState | null>(null);
 
   // Apply hospital filter if selected
@@ -100,7 +102,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
       if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
         try { navigator.vibrate(20); } catch { /* ignore */ }
       }
-      onQuickAssignShift(dayItem.date, targetHosp.id, selectedTemplateCode, 'create');
+      onQuickAssignShift(dayItem.date, targetHosp.id, selectedTemplateCode, 'create', quickDepartment);
       return;
     }
 
@@ -148,7 +150,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
         // Ignore
       }
     }
-    onQuickAssignShift(dayItem.date, targetHosp.id, selectedTemplateCode, 'create');
+    onQuickAssignShift(dayItem.date, targetHosp.id, selectedTemplateCode, 'create', quickDepartment);
   };
 
   return (
@@ -242,33 +244,69 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
             </div>
           </div>
 
-          {/* Banner de Previsualización: Barra Lateral + Badge de Turno */}
+          {/* 3. Área de trabajo / Sala / Departamento (Textbox) */}
+          <div className="space-y-1">
+            <span className="text-[11px] font-bold text-sky-300 uppercase tracking-wider font-mono block">
+              3. Área de trabajo / Sala (opcional):
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={quickDepartment}
+                onChange={(e) => setQuickDepartment(e.target.value)}
+                placeholder="Ej: Quirófano, UCI, Emergencias, Piso 3, Sala de Partos..."
+                className="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none shadow-inner min-h-[40px]"
+              />
+              {quickDepartment && (
+                <button
+                  type="button"
+                  onClick={() => setQuickDepartment('')}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold shrink-0 min-h-[40px]"
+                  title="Limpiar área"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Banner de Previsualización: 2 Filas (Arriba Turno, Abajo Centro) + Barra Lateral */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs">
             <div className="flex items-center gap-2.5 min-w-0">
-              {/* Tarjeta de previsualización Opción 1 */}
-              <div className="relative pl-3 pr-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center gap-2 shadow-sm overflow-hidden shrink-0">
+              {/* Tarjeta de previsualización 2 filas */}
+              <div className="relative pl-3 pr-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-center gap-0.5 shadow-sm overflow-hidden shrink-0 min-w-[110px]">
                 {/* Barra lateral */}
                 <div
                   className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl"
                   style={{ backgroundColor: activeHospColor }}
                 />
-                <span className="font-extrabold text-xs text-white flex items-center gap-1">
-                  {activeHosp?.emoji && <span>{activeHosp.emoji}</span>}
-                  <span>{activeHosp?.shortName || 'Centro'}</span>
-                </span>
-                <span
-                  className="px-2 py-0.5 rounded-md text-[10px] font-black font-mono shadow-sm border border-white/20"
-                  style={{
-                    backgroundColor: activeShiftColor,
-                    color: getContrastTextColor(activeShiftColor),
-                  }}
-                >
-                  {selectedTemplateCode}
-                </span>
+                {/* Fila 1: Turno */}
+                <div className="flex items-center justify-between gap-1 leading-none pl-0.5">
+                  <span
+                    className="px-1.5 py-0.5 rounded text-[10px] font-black font-mono shadow-sm border border-white/20"
+                    style={{
+                      backgroundColor: activeShiftColor,
+                      color: getContrastTextColor(activeShiftColor),
+                    }}
+                  >
+                    {selectedTemplateCode}
+                  </span>
+                  <span className="text-[9.5px] font-mono text-slate-400">
+                    {activeTpl?.defaultHours || 8}h
+                  </span>
+                </div>
+                {/* Fila 2: Centro */}
+                <div className="flex items-center gap-1 min-w-0 leading-tight pl-0.5">
+                  {activeHosp?.emoji && <span className="text-xs leading-none shrink-0">{activeHosp.emoji}</span>}
+                  <span className="font-extrabold text-[11px] text-white tracking-tight truncate drop-shadow-sm">
+                    {activeHosp?.shortName || 'Centro'}
+                  </span>
+                </div>
               </div>
 
               <div className="min-w-0 leading-tight">
                 <p className="text-slate-200 font-bold">
+                  {quickDepartment ? <span className="text-teal-300">Área: {quickDepartment} · </span> : ''}
                   Toca cualquier día para asignar o quitar este turno.
                 </p>
                 <p className="text-[11px] text-slate-400 truncate">
@@ -427,49 +465,57 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     return (
                       <div
                         key={shift.id || idx}
-                        className={`rounded-lg py-1 pl-2 pr-1.5 shadow-md flex items-center justify-between gap-1 transition-all hover:scale-[1.02] relative overflow-hidden bg-slate-900 border ${
+                        className={`rounded-lg py-1 pl-2.5 pr-1.5 shadow-md flex flex-col justify-center gap-0.5 transition-all hover:scale-[1.02] relative overflow-hidden bg-slate-900 border ${
                           isCollisionShift
                             ? 'border-red-500/80 ring-1 ring-red-500/60 bg-red-950/40'
                             : isLibreShift
                             ? 'border-emerald-500/40 bg-slate-900/90'
                             : 'border-slate-800 hover:border-slate-700'
                         }`}
-                        title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${isLibreShift ? '0h (Libre)' : `${shift.hours}h`}${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
+                        title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${isLibreShift ? '0h (Libre)' : `${shift.hours}h`}${shift.department ? ` · Área: ${shift.department}` : ''}${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                       >
-                        {/* Barra lateral izquierda del Centro de Trabajo */}
+                        {/* Barra lateral izquierda del Centro de Trabajo (cubre las 2 filas) */}
                         <div
-                          className="absolute left-0 top-0 bottom-0 w-1 sm:w-1.5 shadow-sm"
+                          className="absolute left-0 top-0 bottom-0 w-1.5 shadow-sm"
                           style={{
                             backgroundColor: isCollisionShift ? '#ef4444' : workplaceColor,
                           }}
                         />
 
-                        {/* Izquierda: Emoji + Nombre del Centro en Blanco y Negrita */}
-                        <div className="flex items-center gap-1 min-w-0">
+                        {/* Fila 1 (Arriba): Nombre y Color del Turno (+ horas) */}
+                        <div className="flex items-center justify-between gap-1 leading-none pl-0.5">
+                          <span
+                            className="px-1.5 py-0.5 rounded text-[9.5px] sm:text-[10px] font-black font-mono shadow-sm shrink-0 border border-white/20 leading-none flex items-center gap-0.5"
+                            style={{
+                              backgroundColor: isCollisionShift
+                                ? '#dc2626'
+                                : isLibreShift
+                                ? '#059669'
+                                : shiftColor,
+                              color: isCollisionShift || isLibreShift ? '#ffffff' : shiftTextColor,
+                            }}
+                          >
+                            {isCollisionShift ? '⚠️' : displayCode}
+                          </span>
+
+                          {!isLibreShift && (
+                            <span className="text-[9px] font-mono font-medium text-slate-400">
+                              {shift.hours}h
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Fila 2 (Abajo): Nombre abreviado del centro (sin color extra, sobre el fondo oscuro) */}
+                        <div className="flex items-center gap-1 min-w-0 leading-tight pl-0.5">
                           {hosp?.emoji && (
-                            <span className="text-xs sm:text-sm leading-none shrink-0">
+                            <span className="text-[10px] sm:text-xs leading-none shrink-0">
                               {hosp.emoji}
                             </span>
                           )}
-                          <span className="font-extrabold text-[10.5px] sm:text-[11.5px] text-white tracking-tight truncate drop-shadow-sm">
+                          <span className="font-extrabold text-[10px] sm:text-[11px] text-white tracking-tight truncate drop-shadow-sm">
                             {hospShortName}
                           </span>
                         </div>
-
-                        {/* Derecha: Píldora del Turno */}
-                        <span
-                          className="px-1.5 py-0.5 rounded-md text-[9.5px] sm:text-[10px] font-black font-mono shadow-sm shrink-0 border border-white/20 leading-none flex items-center gap-0.5"
-                          style={{
-                            backgroundColor: isCollisionShift
-                              ? '#dc2626'
-                              : isLibreShift
-                              ? '#059669'
-                              : shiftColor,
-                            color: isCollisionShift || isLibreShift ? '#ffffff' : shiftTextColor,
-                          }}
-                        >
-                          {isCollisionShift ? '⚠️' : displayCode}
-                        </span>
                       </div>
                     );
                   })}
@@ -538,7 +584,8 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     collisionDialog.date,
                     collisionDialog.newHospitalId,
                     collisionDialog.newTemplateCode,
-                    'mark_collision'
+                    'mark_collision',
+                    quickDepartment
                   );
                   setCollisionDialog(null);
                 }}
@@ -554,7 +601,8 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     collisionDialog.date,
                     collisionDialog.newHospitalId,
                     collisionDialog.newTemplateCode,
-                    'replace'
+                    'replace',
+                    quickDepartment
                   );
                   setCollisionDialog(null);
                 }}
@@ -570,7 +618,8 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     collisionDialog.date,
                     collisionDialog.newHospitalId,
                     collisionDialog.newTemplateCode,
-                    'keep_both'
+                    'keep_both',
+                    quickDepartment
                   );
                   setCollisionDialog(null);
                 }}

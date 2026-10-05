@@ -665,7 +665,8 @@ export default function App() {
     date: string,
     hospitalId: string,
     templateCode: ShiftCode,
-    resolution: 'create' | 'replace' | 'keep_both' | 'mark_collision' = 'create'
+    resolution: 'create' | 'replace' | 'keep_both' | 'mark_collision' = 'create',
+    department?: string
   ) => {
     const tpl = templates.find((t) => t.code === templateCode) || DEFAULT_TEMPLATES.find((t) => t.code === templateCode);
     const hosp = hospitals.find((h) => h.id === hospitalId) || hospitals[0];
@@ -683,6 +684,7 @@ export default function App() {
       startTime: tpl.defaultStartTime,
       endTime: tpl.defaultEndTime,
       hours: isShiftLibre(tpl.code) ? 0 : tpl.defaultHours,
+      department: department?.trim() || '',
       color: isCollisionShift ? '#dc2626' : (tpl.color || '#f59e0b'),
       isNightShift: tpl.isNightShift,
       isCollision: isCollisionShift,

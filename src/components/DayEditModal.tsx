@@ -480,7 +480,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                                 )}
                               </div>
 
-                              <div className="flex items-center gap-2 text-xs text-slate-400 truncate">
+                              <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
                                 {isWholeDayOff ? (
                                   <span className="text-emerald-400 font-semibold">
                                     0h (Descanso de turnos)
@@ -494,8 +494,16 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                                     {shift.hours}h laboradas
                                   </span>
                                 )}
-                                {shift.department && <span>· {shift.department}</span>}
-                                {shift.notes && <span className="italic">· {shift.notes}</span>}
+                                {shift.department && (
+                                  <span className="text-teal-300 font-semibold bg-teal-950/70 border border-teal-800/40 px-1.5 py-0.5 rounded text-[11px]">
+                                    Área: {shift.department}
+                                  </span>
+                                )}
+                                {shift.notes && (
+                                  <span className="text-amber-200 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.5 rounded italic text-[11px]">
+                                    Nota: {shift.notes}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>

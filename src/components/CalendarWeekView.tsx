@@ -167,7 +167,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                 )}
 
                 {/* Shifts inside this day */}
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {dayShifts.map((shift) => {
                     const hosp = getHospitalForShift(shift, hospitals);
                     const workplaceColor = hosp?.color || hosp?.gradientStart || '#0d9488';
@@ -179,7 +179,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                     return (
                       <div
                         key={shift.id}
-                        className={`p-2.5 rounded-xl text-white text-xs shadow-md space-y-1 relative overflow-hidden bg-slate-900 border ${
+                        className={`p-2.5 pl-3 rounded-xl text-white text-xs shadow-md space-y-1.5 relative overflow-hidden bg-slate-900 border ${
                           isCollisionShift
                             ? 'border-red-500/80 ring-1 ring-red-500/60 bg-red-950/40'
                             : isLibre
@@ -187,21 +187,18 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                             : 'border-slate-800 hover:border-slate-700'
                         }`}
                       >
-                        {/* Barra lateral del centro */}
+                        {/* Barra lateral del centro que ocupa todo el alto */}
                         <div
-                          className="absolute left-0 top-0 bottom-0 w-1.5"
+                          className="absolute left-0 top-0 bottom-0 w-1.5 shadow-sm"
                           style={{
                             backgroundColor: isCollisionShift ? '#ef4444' : workplaceColor,
                           }}
                         />
 
-                        <div className="flex items-center justify-between gap-1 pl-1">
-                          <span className="font-extrabold text-white text-xs truncate flex items-center gap-1">
-                            {hosp?.emoji && <span className="text-xs leading-none shrink-0">{hosp.emoji}</span>}
-                            <span>{hosp?.shortName || hosp?.name || 'Centro'}</span>
-                          </span>
+                        {/* Fila 1 (Arriba): Nombre y Color del Turno + Horas */}
+                        <div className="flex items-center justify-between gap-1 pl-1 leading-none">
                           <span
-                            className="px-1.5 py-0.5 rounded-md font-mono font-black text-[10px] shadow-sm border border-white/20"
+                            className="px-2 py-0.5 rounded-md font-mono font-black text-[10.5px] shadow-sm border border-white/20"
                             style={{
                               backgroundColor: isCollisionShift ? '#dc2626' : isLibre ? '#059669' : shiftColor,
                               color: isCollisionShift || isLibre ? '#ffffff' : shiftTextColor,
@@ -209,22 +206,40 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                           >
                             {isCollisionShift ? '⚠️ CHOQUE' : getShiftDisplayCode(shift.shiftCode)}
                           </span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[10.5px] opacity-90 font-mono pl-1">
-                          <span className="flex items-center gap-1 text-slate-300">
-                            <Clock className="w-3 h-3 text-teal-400" />
-                            {shift.startTime} - {shift.endTime}
-                          </span>
-                          <span className="font-bold text-teal-300">
+                          <span className="font-bold text-[11px] text-teal-300 font-mono">
                             {isLibre ? '0h' : `${shift.hours}h`}
                           </span>
                         </div>
 
+                        {/* Fila 2 (Abajo): Nombre abreviado del centro de trabajo (sin color extra) */}
+                        <div className="flex items-center gap-1.5 pl-1 leading-tight min-w-0">
+                          {hosp?.emoji && <span className="text-xs leading-none shrink-0">{hosp.emoji}</span>}
+                          <span className="font-extrabold text-white text-xs truncate drop-shadow-sm">
+                            {hosp?.shortName || hosp?.name || 'Centro'}
+                          </span>
+                        </div>
+
+                        {/* Horario */}
+                        <div className="flex items-center gap-1 text-[10.5px] text-slate-300 opacity-90 font-mono pl-1">
+                          <Clock className="w-3 h-3 text-teal-400 shrink-0" />
+                          <span>{shift.startTime} - {shift.endTime}</span>
+                        </div>
+
+                        {/* Área / Departamento (si existe) */}
+                        {shift.department && (
+                          <div className="pl-1">
+                            <span className="text-[10px] text-teal-300 bg-teal-950/70 border border-teal-800/40 px-1.5 py-0.5 rounded font-semibold inline-block truncate max-w-full">
+                              Área: {shift.department}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Nota del turno (si existe) */}
                         {shift.notes && (
-                          <p className="text-[10px] text-amber-200 bg-black/25 px-1 py-0.5 rounded truncate italic ml-1">
-                            {shift.notes}
-                          </p>
+                          <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-200 text-[10px] ml-1 leading-snug">
+                            <span className="font-bold text-amber-300">Nota: </span>
+                            <span className="italic">{shift.notes}</span>
+                          </div>
                         )}
                       </div>
                     );

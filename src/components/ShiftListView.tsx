@@ -164,36 +164,51 @@ export const ShiftListView: React.FC<ShiftListViewProps> = ({
                 <div className="space-y-2 pt-1">
                   {group.shifts.map((shift, idx) => {
                     const hosp = getHospitalForShift(shift, hospitals);
+                    const workplaceColor = hosp?.color || hosp?.gradientStart || '#0d9488';
 
                     return (
                       <div
                         key={shift.id || idx}
                         onClick={() => onSelectDate(shift.date)}
-                        className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors cursor-pointer group"
+                        className="p-3.5 pl-4 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors cursor-pointer group relative overflow-hidden shadow-sm"
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        {/* Barra lateral del centro */}
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-1.5 shadow-sm"
+                          style={{ backgroundColor: workplaceColor }}
+                        />
+
+                        <div className="flex items-center gap-3 min-w-0 pl-1">
                           {/* Hospital badge with solid color and emoji */}
                           <div
                             className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-md text-base font-bold"
                             style={{
-                              backgroundColor: hosp?.color || hosp?.gradientStart || '#0d9488',
+                              backgroundColor: workplaceColor,
                             }}
                           >
                             {hosp?.emoji ? <span>{hosp.emoji}</span> : <Building2 className="w-5 h-5" />}
                           </div>
 
-                          <div className="min-w-0 space-y-0.5">
+                          <div className="min-w-0 space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-bold text-xs sm:text-sm text-slate-100 truncate">
+                              <p className="font-extrabold text-xs sm:text-sm text-white truncate drop-shadow-sm">
                                 {hosp?.name || 'Centro de Trabajo'}
                               </p>
-                              <span className="font-mono text-[10.5px] px-1.5 py-0.2 rounded bg-slate-800 text-teal-300">
+                              <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-teal-300">
                                 {hosp?.shortName || ''}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-400 truncate">
-                              {hosp?.city || 'Honduras'} {shift.department && `· ${shift.department}`}
-                            </p>
+
+                            <div className="flex items-center gap-2 text-[11px] text-slate-400 flex-wrap">
+                              <span>{hosp?.city || 'Honduras'}</span>
+
+                              {/* Área explícita */}
+                              {shift.department && (
+                                <span className="text-teal-300 font-semibold bg-teal-950/70 border border-teal-800/40 px-1.5 py-0.5 rounded text-[10.5px]">
+                                  Área: {shift.department}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -203,7 +218,7 @@ export const ShiftListView: React.FC<ShiftListViewProps> = ({
                             <p className="text-xs font-mono font-bold text-slate-200">
                               {shift.startTime} - {shift.endTime}
                             </p>
-                            <p className="text-[11px] font-mono text-teal-400">
+                            <p className="text-[11px] font-mono font-bold text-teal-400">
                               {shift.hours} horas
                             </p>
                           </div>
@@ -213,9 +228,12 @@ export const ShiftListView: React.FC<ShiftListViewProps> = ({
 
                         {/* Note preview if any */}
                         {shift.notes && (
-                          <div className="w-full sm:w-auto p-2 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs flex items-center gap-1.5 font-sans mt-1 sm:mt-0">
-                            <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span className="truncate italic max-w-xs">{shift.notes}</span>
+                          <div className="w-full sm:w-auto p-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs flex items-start gap-1.5 font-sans mt-1 sm:mt-0">
+                            <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                            <div className="leading-snug">
+                              <span className="font-bold text-amber-300">Nota: </span>
+                              <span className="italic">{shift.notes}</span>
+                            </div>
                           </div>
                         )}
                       </div>
