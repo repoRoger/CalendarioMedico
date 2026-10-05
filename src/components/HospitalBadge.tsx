@@ -76,16 +76,16 @@ export const HospitalBadge: React.FC<HospitalBadgeProps> = ({
   return (
     <div className={`inline-flex items-center gap-2 ${className}`}>
       <div
-        className={`flex items-center justify-center shrink-0 rounded-md text-white shadow-sm transition-transform hover:scale-105 ${sizeStyles[size]}`}
+        className={`flex items-center justify-center shrink-0 rounded-xl text-white shadow-sm transition-transform hover:scale-105 font-bold ${sizeStyles[size]}`}
         style={{
-          background: `linear-gradient(135deg, ${hospital.gradientStart || hospital.color}, ${hospital.gradientEnd || hospital.color})`,
+          backgroundColor: hospital.color || hospital.gradientStart || '#0d9488',
         }}
         title={`${hospital.name} (${hospital.city})`}
       >
-        {renderIcon()}
+        {hospital.emoji ? <span className="leading-none">{hospital.emoji}</span> : renderIcon()}
       </div>
       {showName && (
-        <span className="font-medium text-slate-200 truncate text-xs">
+        <span className="font-bold text-slate-200 truncate text-xs">
           {hospital.shortName}
         </span>
       )}

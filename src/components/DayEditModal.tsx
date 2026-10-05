@@ -3,11 +3,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   X, Plus, Trash2, Clock, Building2, AlertCircle, Check,
   Calendar, ShieldAlert, Moon, UserCheck, FileText, Edit2,
-  ArrowLeft, ChevronRight
+  ArrowLeft, ChevronRight, AlertTriangle
 } from 'lucide-react';
 import { Hospital, MedicalShift, ShiftCode, ShiftTemplate } from '../types';
-import { calculateShiftHours, formatFriendlyDate, getShiftDisplayCode, getShiftDisplayName } from '../lib/timeUtils';
-import { getHospitalForShift } from '../lib/storage';
+import {
+  calculateShiftHours, formatFriendlyDate, getShiftDisplayCode,
+  getShiftDisplayName, doShiftsOverlap, isShiftLibre, isShiftCollision
+} from '../lib/timeUtils';
+import { getHospitalForShift, getShiftColor } from '../lib/storage';
 
 interface DayEditModalProps {
   isOpen: boolean;
@@ -44,6 +47,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
 
   // Validation warning state
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [allowForceCollision, setAllowForceCollision] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -64,6 +68,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
       setEditingIndex(null);
       setActiveShift(null);
       setValidationError(null);
+      setAllowForceCollision(false);
     }
   }, [isOpen, existingShifts, hospitals]);
 
@@ -71,11 +76,26 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
 
   const defaultHospitalId = hospitals[0]?.id || '';
 
+  // Check overlap helper
+  const checkOverlap = (target: MedicalShift, currentEditingIdx: number | null) => {
+    if (isShiftLibre(target.shiftCode)) return null;
+
+    const conflict = shifts.find((s, idx) => {
+      if (currentEditingIdx !== null && idx === currentEditingIdx) return false;
+      if (isShiftLibre(s.shiftCode)) return false;
+      return doShiftsOverlap(target, s);
+    });
+
+    return conflict || null;
+  };
+
   // Start editing an existing shift
   const handleOpenEditShift = (index: number) => {
+    const shiftToEdit = JSON.parse(JSON.stringify(shifts[index]));
     setEditingIndex(index);
-    setActiveShift(JSON.parse(JSON.stringify(shifts[index])));
+    setActiveShift(shiftToEdit);
     setValidationError(null);
+    setAllowForceCollision(false);
     setModalMode('edit');
   };
 
@@ -105,6 +125,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
     setEditingIndex(null); // Indicates brand new shift
     setActiveShift(newShift);
     setValidationError(null);
+    setAllowForceCollision(false);
     setModalMode('edit');
   };
 
@@ -123,17 +144,17 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
       target.isNightShift = sH >= 20 || eH <= 8 || target.shiftCode === 'N' || target.shiftCode === '24H' || target.shiftCode === 'TB-TC' || target.shiftCode === 'TC-TA';
     }
 
-    // Check duplicate schedule in real-time
-    const duplicate = shifts.some((s, idx) => {
-      if (editingIndex !== null && idx === editingIndex) return false;
-      if (s.shiftCode === 'L' || s.shiftCode === 'LIBRE' || target.shiftCode === 'LIBRE' || target.shiftCode === 'L') return false;
-      return s.startTime === target.startTime && s.endTime === target.endTime;
-    });
-
-    if (duplicate) {
-      setValidationError(`Ya existe otro turno registrado con el mismo horario (${target.startTime} - ${target.endTime}) en este día.`);
+    // Check intelligent overlap in real-time
+    const conflict = checkOverlap(target, editingIndex);
+    if (conflict) {
+      const conflictHosp = getHospitalForShift(conflict, hospitals);
+      setValidationError(
+        `⚠️ Conflicto de horario: Las horas (${target.startTime} - ${target.endTime}) se solapan con el turno "${conflict.title}" en ${conflictHosp?.shortName || 'otro centro'} (${conflict.startTime} - ${conflict.endTime}).`
+      );
+      setAllowForceCollision(true);
     } else {
       setValidationError(null);
+      setAllowForceCollision(false);
     }
 
     setActiveShift(target);
@@ -225,25 +246,19 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
   };
 
   // Save the currently edited shift back into the shifts array
-  const handleSaveActiveShift = () => {
+  const handleSaveActiveShift = (forceAsCollision = false) => {
     if (!activeShift) return;
 
-    // Validate duplicate schedule before confirming
-    const duplicate = shifts.find((s, idx) => {
-      if (editingIndex !== null && idx === editingIndex) return false;
-      if (s.shiftCode === 'L' || s.shiftCode === 'LIBRE' || activeShift.shiftCode === 'LIBRE' || activeShift.shiftCode === 'L') return false;
-      return s.startTime === activeShift.startTime && s.endTime === activeShift.endTime;
-    });
+    // Check overlap if not forced
+    const conflict = checkOverlap(activeShift, editingIndex);
 
-    if (duplicate) {
-      setValidationError(`No se puede guardar: Ya tienes el turno "${duplicate.title}" en el mismo horario (${duplicate.startTime} - ${duplicate.endTime}) para este día.`);
-      return;
-    }
-
-    // Ensure valid hospitalId
     let finalShift = { ...activeShift };
     if (!finalShift.hospitalId && hospitals.length > 0) {
       finalShift.hospitalId = hospitals[0].id;
+    }
+
+    if (conflict && (forceAsCollision || finalShift.shiftCode === 'CHOQUE')) {
+      finalShift.isCollision = true;
     }
 
     let nextShifts: MedicalShift[];
@@ -266,6 +281,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
     setEditingIndex(null);
     setActiveShift(null);
     setValidationError(null);
+    setAllowForceCollision(false);
   };
 
   // Delete a shift from the list (auto-persists immediately)
@@ -295,16 +311,14 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
   };
 
   const totalDayHours = shifts.reduce(
-    (acc, s) => (s.shiftCode === 'LIBRE' || s.shiftCode === 'L' ? acc : acc + (s.hours || 0)),
+    (acc, s) => (isShiftLibre(s.shiftCode) ? acc : acc + (s.hours || 0)),
     0
   );
   const is24HourDay = totalDayHours >= 24;
 
-  // Final confirmation to save the whole day
-  const handleSaveWholeDay = () => {
-    onSaveDayShifts(date, shifts);
-    onClose();
-  };
+  const currentHosp = activeShift ? getHospitalForShift(activeShift, hospitals) : null;
+  const currentWorkplaceColor = currentHosp?.color || currentHosp?.gradientStart || '#0d9488';
+  const currentShiftColor = activeShift ? getShiftColor(activeShift.shiftCode, templates) : '#f59e0b';
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
@@ -312,7 +326,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 40 }}
-        className="w-full max-w-2xl bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col my-0 sm:my-auto"
+        className="w-full max-w-2xl bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col my-0 sm:my-auto"
       >
         {/* Mobile Grab Handle */}
         <div className="sm:hidden w-12 h-1.5 bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 shrink-0" />
@@ -328,14 +342,15 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                   setActiveShift(null);
                   setEditingIndex(null);
                   setValidationError(null);
+                  setAllowForceCollision(false);
                 }}
-                className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors shrink-0"
+                className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors shrink-0 min-h-[40px] min-w-[40px]"
                 title="Volver al listado de turnos"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-5 h-5" />
               </button>
             ) : (
-              <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center shrink-0">
                 <Calendar className="w-5 h-5" />
               </div>
             )}
@@ -366,7 +381,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
               title="Cerrar ventana"
             >
               <X className="w-5 h-5" />
@@ -402,24 +417,41 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                     {shifts.map((shift, idx) => {
                       const hosp = getHospitalForShift(shift, hospitals);
                       const isWholeDayOff = shift.shiftCode === 'L' && shift.title.toLowerCase().includes('libre');
-                      const isCenterLibre = shift.shiftCode === 'LIBRE' || (shift.shiftCode === 'L' && !isWholeDayOff);
+                      const isCenterLibre = isShiftLibre(shift.shiftCode) && !isWholeDayOff;
+                      const isCollision = isShiftCollision(shift.shiftCode) || shift.isCollision;
+                      const workplaceColor = hosp?.color || hosp?.gradientStart || '#0d9488';
+                      const shiftColor = getShiftColor(shift.shiftCode, templates);
 
                       return (
                         <div
                           key={shift.id || idx}
-                          className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors group"
+                          className={`p-3.5 rounded-2xl bg-slate-950/80 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors group ${
+                            isCollision
+                              ? 'border-red-500/60 ring-1 ring-red-500/50'
+                              : 'border-slate-800 hover:border-slate-700'
+                          }`}
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            {/* Hospital or Free icon badge */}
+                            {/* Hospital or Free icon badge with gradient fusion */}
                             <div
-                              className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 font-bold text-xs shadow-md"
+                              className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shrink-0 font-bold text-base shadow-md border border-white/20"
                               style={{
-                                background: isWholeDayOff
+                                background: isCollision
+                                  ? 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)'
+                                  : isWholeDayOff
                                   ? '#064e3b'
-                                  : `linear-gradient(135deg, ${hosp?.gradientStart || '#0d9488'}, ${hosp?.gradientEnd || '#059669'})`,
+                                  : isCenterLibre
+                                  ? `linear-gradient(135deg, ${workplaceColor} 0%, #059669 100%)`
+                                  : `linear-gradient(135deg, ${workplaceColor} 0%, ${shiftColor} 100%)`,
                               }}
                             >
-                              {isWholeDayOff ? <Moon className="w-5 h-5 text-emerald-300" /> : <Building2 className="w-5 h-5" />}
+                              {isWholeDayOff ? (
+                                <Moon className="w-5 h-5 text-emerald-300" />
+                              ) : hosp?.emoji ? (
+                                <span>{hosp.emoji}</span>
+                              ) : (
+                                <Building2 className="w-5 h-5" />
+                              )}
                             </div>
 
                             <div className="min-w-0 space-y-0.5">
@@ -428,11 +460,16 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                                   {isWholeDayOff ? 'Día Libre Completo' : (hosp?.shortName || hosp?.name || 'Centro')}
                                 </span>
 
-                                <span className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold ${
-                                  isCenterLibre || isWholeDayOff
-                                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30'
-                                    : 'bg-slate-800 text-teal-300'
-                                }`}>
+                                <span
+                                  className="px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold text-white shadow-sm border border-white/20"
+                                  style={{
+                                    backgroundColor: isCollision
+                                      ? '#dc2626'
+                                      : isWholeDayOff || isCenterLibre
+                                      ? '#059669'
+                                      : shiftColor,
+                                  }}
+                                >
                                   {getShiftDisplayCode(shift.shiftCode)}: {getShiftDisplayName(shift.title || shift.shiftCode)}
                                 </span>
 
@@ -468,7 +505,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleOpenEditShift(idx)}
-                              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-teal-600 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 min-h-[36px]"
+                              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-teal-600 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 min-h-[40px]"
                               title="Editar este turno específico"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
@@ -478,7 +515,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleRemoveShift(idx)}
-                              className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors border border-slate-700 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                              className="p-2.5 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors border border-slate-700 min-h-[40px] min-w-[40px] flex items-center justify-center"
                               title="Eliminar este turno"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -495,7 +532,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleOpenNewShift('TA')}
-                    className="flex-1 py-3 px-4 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-teal-900/30 transition-all active:scale-[0.98] min-h-[44px]"
+                    className="flex-1 py-3 px-4 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-teal-900/30 transition-all active:scale-[0.98] min-h-[46px]"
                   >
                     <Plus className="w-4 h-4" />
                     <span>+ Agregar Turno a este día</span>
@@ -504,7 +541,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                   <button
                     type="button"
                     onClick={handleSetDayOff}
-                    className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition-colors min-h-[44px]"
+                    className="py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition-colors min-h-[46px]"
                   >
                     <Moon className="w-4 h-4 text-purple-400" />
                     <span>Marcar Día Libre</span>
@@ -521,22 +558,36 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                   exit={{ opacity: 0, x: -15 }}
                   className="space-y-4"
                 >
-                  {/* Duplicate Schedule Warning */}
+                  {/* Collision Warning Banner */}
                   {validationError && (
-                    <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5 font-medium animate-pulse">
-                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                      <span>{validationError}</span>
+                    <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs space-y-2 animate-in fade-in">
+                      <div className="flex items-start gap-2.5 font-medium">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <span className="leading-snug">{validationError}</span>
+                      </div>
+                      {allowForceCollision && (
+                        <div className="flex items-center justify-end gap-2 pt-1 border-t border-amber-500/20">
+                          <button
+                            type="button"
+                            onClick={() => handleSaveActiveShift(true)}
+                            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-transform active:scale-95"
+                          >
+                            <span>Guardar con Alerta de Choque</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* 1. Selector de Centro de Trabajo */}
+                  {/* 1. Selector de Centro de Trabajo (Colores sólidos) */}
                   <div className="space-y-2">
                     <label className="block text-xs font-bold text-slate-300">
-                      Centro de Trabajo / Lugar:
+                      1. Centro de Trabajo / Lugar:
                     </label>
                     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
                       {hospitals.map((hosp) => {
                         const isSelected = activeShift.hospitalId === hosp.id;
+                        const hospColor = hosp.color || hosp.gradientStart || '#0d9488';
                         return (
                           <button
                             key={hosp.id}
@@ -544,16 +595,14 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                             onClick={() => handleUpdateActiveShift({ hospitalId: hosp.id })}
                             className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 border ${
                               isSelected
-                                ? 'text-white border-teal-400 shadow-md ring-1 ring-teal-400'
+                                ? 'text-white border-white shadow-lg ring-2 ring-white scale-102 font-black'
                                 : 'text-slate-400 bg-slate-950 border-slate-800 hover:text-slate-200'
                             }`}
                             style={{
-                              background: isSelected
-                                ? `linear-gradient(135deg, ${hosp.gradientStart}, ${hosp.gradientEnd})`
-                                : undefined,
+                              backgroundColor: isSelected ? hospColor : undefined,
                             }}
                           >
-                            <Building2 className="w-4 h-4" />
+                            <span className="text-base">{hosp.emoji || '🏥'}</span>
                             <span>{hosp.shortName}</span>
                           </button>
                         );
@@ -561,30 +610,37 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 2. Botones rápidos de Tipo de Turno */}
+                  {/* 2. Botones rápidos de Tipo de Turno (Colores de plantilla) */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-slate-300">
-                      Horario Recomendado / Plantilla:
+                      2. Tipo de Turno / Plantilla:
                     </label>
                     <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                      {templates.map((tpl) => (
-                        <button
-                          key={tpl.id}
-                          type="button"
-                          onClick={() => handleApplyTemplateToActive(tpl.code)}
-                          className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                            activeShift.shiftCode === tpl.code
-                              ? 'bg-slate-700 text-teal-300 border border-teal-500/40 shadow-sm'
-                              : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-slate-200'
-                          }`}
-                        >
-                          {tpl.name || tpl.code}
-                        </button>
-                      ))}
+                      {templates.map((tpl) => {
+                        const isSelected = activeShift.shiftCode === tpl.code;
+                        const shiftColor = getShiftColor(tpl.code, templates);
+                        return (
+                          <button
+                            key={tpl.id}
+                            type="button"
+                            onClick={() => handleApplyTemplateToActive(tpl.code)}
+                            className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border ${
+                              isSelected
+                                ? 'text-white border-white shadow-lg ring-2 ring-white scale-105 font-black'
+                                : 'text-slate-400 bg-slate-950 border-slate-800 hover:text-slate-200'
+                            }`}
+                            style={{
+                              backgroundColor: isSelected ? shiftColor : undefined,
+                            }}
+                          >
+                            {tpl.name || tpl.code}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* 3. Ajuste de Horas Inicio y Fin con Steppers para Móvil (Misma Fila) */}
+                  {/* 3. Ajuste de Horas Inicio y Fin con Steppers para Móvil */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     {/* Hora Inicio */}
                     <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2">
@@ -596,7 +652,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleAdjustTime('startTime', -1)}
-                          className="h-11 px-3.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-700 text-slate-200 rounded-xl text-xs font-mono font-bold border border-slate-700 active:scale-95 transition-all shadow-sm flex items-center justify-center shrink-0"
+                          className="h-11 px-3.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-700 text-slate-200 rounded-xl text-xs font-mono font-bold border border-slate-700 active:scale-95 transition-all shadow-sm flex items-center justify-center shrink-0 min-w-[44px]"
                           title="Restar 1 hora"
                         >
                           -1h
@@ -610,7 +666,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleAdjustTime('startTime', 1)}
-                          className="h-11 px-3.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-700 text-teal-300 rounded-xl text-xs font-mono font-bold border border-slate-700 active:scale-95 transition-all shadow-sm flex items-center justify-center shrink-0"
+                          className="h-11 px-3.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-700 text-teal-300 rounded-xl text-xs font-mono font-bold border border-slate-700 active:scale-95 transition-all shadow-sm flex items-center justify-center shrink-0 min-w-[44px]"
                           title="Sumar 1 hora"
                         >
                           +1h
@@ -628,7 +684,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleAdjustTime('endTime', -1)}
-                          className="h-11 px-3.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-700 text-slate-200 rounded-xl text-xs font-mono font-bold border border-slate-700 active:scale-95 transition-all shadow-sm flex items-center justify-center shrink-0"
+                          className="h-11 px-3.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-700 text-slate-200 rounded-xl text-xs font-mono font-bold border border-slate-700 active:scale-95 transition-all shadow-sm flex items-center justify-center shrink-0 min-w-[44px]"
                           title="Restar 1 hora"
                         >
                           -1h
@@ -642,7 +698,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleAdjustTime('endTime', 1)}
-                          className="h-11 px-3.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-700 text-teal-300 rounded-xl text-xs font-mono font-bold border border-slate-700 active:scale-95 transition-all shadow-sm flex items-center justify-center shrink-0"
+                          className="h-11 px-3.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-700 text-teal-300 rounded-xl text-xs font-mono font-bold border border-slate-700 active:scale-95 transition-all shadow-sm flex items-center justify-center shrink-0 min-w-[44px]"
                           title="Sumar 1 hora"
                         >
                           +1h
@@ -651,10 +707,21 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Summary of this shift's hours */}
-                  <div className="p-3 rounded-xl bg-teal-950/40 border border-teal-800/40 flex items-center justify-between">
-                    <span className="text-xs text-teal-200">Duración de este turno:</span>
-                    <span className="text-sm font-black text-teal-300 font-mono">
+                  {/* Summary card with live gradient fusion preview */}
+                  <div
+                    className="p-3.5 rounded-2xl text-white shadow-md border border-white/20 flex items-center justify-between"
+                    style={{
+                      background: `linear-gradient(135deg, ${currentWorkplaceColor} 0%, ${currentShiftColor} 100%)`,
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{currentHosp?.emoji || '🏥'}</span>
+                      <div>
+                        <span className="font-bold text-xs block">{currentHosp?.shortName || 'Centro'} · {activeShift.shiftCode}</span>
+                        <span className="text-[10px] opacity-90">{activeShift.startTime} a {activeShift.endTime}</span>
+                      </div>
+                    </div>
+                    <span className="text-sm font-black font-mono bg-black/25 px-2.5 py-1 rounded-xl">
                       {activeShift.hours} horas
                     </span>
                   </div>
@@ -670,7 +737,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                         placeholder="Ej: Emergencias, UCI, Piso 3"
                         value={activeShift.department || ''}
                         onChange={(e) => handleUpdateActiveShift({ department: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-600 min-h-[42px] focus:outline-none focus:border-teal-500"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-600 min-h-[44px] focus:outline-none focus:border-teal-500"
                       />
                     </div>
 
@@ -680,10 +747,10 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                       </label>
                       <input
                         type="text"
-                        placeholder="Ej: Cubre a colega, doble jornada"
+                        placeholder="Ej: Cubre a colega, guardia extra"
                         value={activeShift.notes || ''}
                         onChange={(e) => handleUpdateActiveShift({ notes: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-600 min-h-[42px] focus:outline-none focus:border-teal-500"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-600 min-h-[44px] focus:outline-none focus:border-teal-500"
                       />
                     </div>
                   </div>
@@ -697,17 +764,17 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                         setActiveShift(null);
                         setEditingIndex(null);
                         setValidationError(null);
+                        setAllowForceCollision(false);
                       }}
-                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors min-h-[42px]"
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors min-h-[44px]"
                     >
                       Cancelar
                     </button>
 
                     <button
                       type="button"
-                      onClick={handleSaveActiveShift}
-                      disabled={!!validationError}
-                      className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-teal-900/40 transition-all active:scale-95 min-h-[42px]"
+                      onClick={() => handleSaveActiveShift(false)}
+                      className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-teal-900/40 transition-all active:scale-95 min-h-[44px]"
                     >
                       <Check className="w-4 h-4" />
                       <span>{editingIndex !== null ? 'Guardar Turno en Nube' : 'Añadir Turno en Nube'}</span>
@@ -735,7 +802,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-2 transition-all active:scale-95 min-h-[42px] border border-slate-700"
+              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-2 transition-all active:scale-95 min-h-[44px] border border-slate-700"
             >
               <Check className="w-4 h-4 text-teal-400" />
               <span>Listo / Cerrar</span>

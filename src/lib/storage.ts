@@ -19,6 +19,7 @@ export const DEFAULT_HOSPITALS: Hospital[] = [
     gradientStart: '#0d9488',
     gradientEnd: '#059669',
     badgeIcon: 'hospital',
+    emoji: '🏥',
     address: 'Bo. Guamilito, 8 Calle, 14 Avenida NO',
     isCustom: false,
   },
@@ -31,6 +32,7 @@ export const DEFAULT_HOSPITALS: Hospital[] = [
     gradientStart: '#4f46e5',
     gradientEnd: '#0284c7',
     badgeIcon: 'cross',
+    emoji: '🏨',
     address: 'Col. Universidad, Boulevard del Norte',
     isCustom: false,
   },
@@ -43,6 +45,7 @@ export const DEFAULT_HOSPITALS: Hospital[] = [
     gradientStart: '#ea580c',
     gradientEnd: '#e11d48',
     badgeIcon: 'heart',
+    emoji: '🩺',
     address: 'Col. Altamira, Blvd. del Sur',
     isCustom: false,
   },
@@ -57,6 +60,7 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultEndTime: '15:00',
     defaultHours: 8,
     description: 'Turno TA (07:00 - 15:00, 8h)',
+    color: '#f59e0b',
     colorBadge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
     isNightShift: false,
   },
@@ -68,6 +72,7 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultEndTime: '21:00',
     defaultHours: 6,
     description: 'Turno TB (15:00 - 21:00, 6h)',
+    color: '#ea580c',
     colorBadge: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
     isNightShift: false,
   },
@@ -79,6 +84,7 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultEndTime: '07:00',
     defaultHours: 10,
     description: 'Turno TC (21:00 - 07:00, 10h)',
+    color: '#6366f1',
     colorBadge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
     isNightShift: true,
   },
@@ -90,8 +96,21 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultEndTime: '07:00',
     defaultHours: 24,
     description: 'Guardia completa de 24 horas continuas',
+    color: '#e11d48',
     colorBadge: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
     isNightShift: true,
+  },
+  {
+    id: 'tpl-choque',
+    code: 'CHOQUE',
+    name: 'Choque',
+    defaultStartTime: '07:00',
+    defaultEndTime: '15:00',
+    defaultHours: 8,
+    description: 'Conflicto / Choque de horario entre 2 centros',
+    color: '#dc2626',
+    colorBadge: 'bg-red-500/30 text-red-200 border-red-500/50',
+    isNightShift: false,
   },
   {
     id: 'tpl-libre-a',
@@ -101,6 +120,7 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultEndTime: '15:00',
     defaultHours: 0,
     description: 'Libre Mañana en este centro (0h, no suma horas)',
+    color: '#10b981',
     colorBadge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     isNightShift: false,
   },
@@ -112,6 +132,7 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultEndTime: '21:00',
     defaultHours: 0,
     description: 'Libre Tarde en este centro (0h, no suma horas)',
+    color: '#059669',
     colorBadge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     isNightShift: false,
   },
@@ -123,6 +144,7 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultEndTime: '07:00',
     defaultHours: 0,
     description: 'Libre Noche en este centro (0h, no suma horas)',
+    color: '#047857',
     colorBadge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     isNightShift: true,
   },
@@ -134,6 +156,7 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultEndTime: '00:00',
     defaultHours: 0,
     description: 'Libre en este centro de trabajo (0h, no suma horas)',
+    color: '#10b981',
     colorBadge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     isNightShift: false,
   },
@@ -145,6 +168,7 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultEndTime: '00:00',
     defaultHours: 0,
     description: 'Día completo de descanso (0h)',
+    color: '#059669',
     colorBadge: 'bg-emerald-600/20 text-emerald-200 border-emerald-500/40',
     isNightShift: false,
   },
@@ -156,6 +180,7 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultEndTime: '21:00',
     defaultHours: 14,
     description: 'Turno mixto TA-TB (07:00 - 21:00, 14h)',
+    color: '#8b5cf6',
     colorBadge: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
     isNightShift: false,
   },
@@ -167,6 +192,7 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultEndTime: '07:00',
     defaultHours: 16,
     description: 'Turno mixto TB-TC (15:00 - 07:00, 16h)',
+    color: '#7c3aed',
     colorBadge: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
     isNightShift: true,
   },
@@ -178,10 +204,27 @@ export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
     defaultEndTime: '15:00',
     defaultHours: 18,
     description: 'Turno mixto TC-TA (21:00 - 15:00, 18h)',
+    color: '#0284c7',
     colorBadge: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
     isNightShift: true,
   },
 ];
+
+export const EMPTY_USER: UserSession = {
+  id: '',
+  titlePrefix: '',
+  personalName: '',
+  name: '',
+  email: '',
+  role: '',
+  specialty: '',
+  phone: '',
+  photoBlob: '',
+  isGoogleAuth: false,
+  isLoggedIn: false,
+};
+
+export const DEFAULT_USER: UserSession = EMPTY_USER;
 
 export const SOFIA_USER: UserSession = {
   id: 'usr-sofia',
@@ -210,8 +253,6 @@ export const ROGER_USER: UserSession = {
   isGoogleAuth: true,
   isLoggedIn: true,
 };
-
-export const DEFAULT_USER: UserSession = ROGER_USER;
 
 // Generates sample shifts (available on demand)
 export function generateSampleShifts(): MedicalShift[] {
@@ -387,9 +428,10 @@ export function getStoredTemplates(): ShiftTemplate[] {
     // Filter out legacy duplicates (M, T, N, D)
     const cleaned = parsed.filter((t) => !['M', 'T', 'N', 'D'].includes(t.code));
 
-    // Sequence: Básicos (TA, TB, TC, 24H), Libres (LIBRE_A, LIBRE_B, LIBRE_C, LIBRE, L), Mixtos (TA-TB, TB-TC, TC-TA)
+    // Sequence: Básicos (TA, TB, TC, 24H), Choque (CHOQUE), Libres (LIBRE_A, LIBRE_B, LIBRE_C, LIBRE, L), Mixtos (TA-TB, TB-TC, TC-TA)
     const orderedCodes: ShiftCode[] = [
       'TA', 'TB', 'TC', '24H',
+      'CHOQUE',
       'LIBRE_A', 'LIBRE_B', 'LIBRE_C', 'LIBRE', 'L',
       'TA-TB', 'TB-TC', 'TC-TA',
     ];
@@ -399,8 +441,8 @@ export function getStoredTemplates(): ShiftTemplate[] {
       const defMatch = DEFAULT_TEMPLATES.find((dt) => dt.code === code);
       const userMatch = cleaned.find((t) => t.code === code);
       if (defMatch) {
-        // Keep the clean, modern name and timestamps from DEFAULT_TEMPLATES
-        result.push(userMatch ? { ...defMatch, ...userMatch, name: defMatch.name } : defMatch);
+        // Keep the clean, modern name, color and timestamps from DEFAULT_TEMPLATES
+        result.push(userMatch ? { ...defMatch, ...userMatch, name: defMatch.name, color: userMatch.color || defMatch.color } : defMatch);
       } else if (userMatch) {
         result.push(userMatch);
       }
@@ -432,12 +474,39 @@ export function getStoredUser(): UserSession {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.USER);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(DEFAULT_USER));
-      return DEFAULT_USER;
+      return EMPTY_USER;
     }
-    return JSON.parse(raw);
+    const parsed: UserSession = JSON.parse(raw);
+    if (!parsed || !parsed.email || !parsed.isLoggedIn) {
+      return EMPTY_USER;
+    }
+    return parsed;
   } catch {
-    return DEFAULT_USER;
+    return EMPTY_USER;
+  }
+}
+
+export function getShiftColor(shiftCode: string, templates?: ShiftTemplate[]): string {
+  const upper = (shiftCode || '').trim().toUpperCase();
+  if (templates && templates.length > 0) {
+    const found = templates.find((t) => t.code === upper);
+    if (found?.color) return found.color;
+  }
+  switch (upper) {
+    case 'TA': return '#f59e0b';
+    case 'TB': return '#ea580c';
+    case 'TC': return '#6366f1';
+    case '24H': return '#e11d48';
+    case 'CHOQUE': return '#dc2626';
+    case 'LIBRE_A': return '#10b981';
+    case 'LIBRE_B': return '#059669';
+    case 'LIBRE_C': return '#047857';
+    case 'LIBRE': return '#10b981';
+    case 'L': return '#059669';
+    case 'TA-TB': return '#8b5cf6';
+    case 'TB-TC': return '#7c3aed';
+    case 'TC-TA': return '#0284c7';
+    default: return '#0d9488';
   }
 }
 

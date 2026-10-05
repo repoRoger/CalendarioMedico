@@ -1,24 +1,53 @@
-import React from 'react';
-import { Plus, Clock, Moon, Sparkles, Building2 } from 'lucide-react';
-import { CalendarDayItem, SPANISH_WEEKDAYS, getShiftDisplayCode, getShiftMobileLabel, isShiftLibre } from '../lib/timeUtils';
-import { MedicalShift, Hospital } from '../types';
-import { getHospitalForShift } from '../lib/storage';
+import React, { useState } from 'react';
+import { Plus, Clock, Moon, Sparkles, Building2, Paintbrush, AlertTriangle, Check, RefreshCw, X, ShieldAlert } from 'lucide-react';
+import {
+  CalendarDayItem, SPANISH_WEEKDAYS, getShiftDisplayCode, getShiftMobileLabel,
+  isShiftLibre, isShiftCollision, formatFriendlyDate, doShiftsOverlap
+} from '../lib/timeUtils';
+import { MedicalShift, Hospital, ShiftTemplate, ShiftCode } from '../types';
+import { getHospitalForShift, getShiftColor } from '../lib/storage';
 
 interface CalendarMonthViewProps {
   days: CalendarDayItem[];
   shifts: MedicalShift[];
   hospitals: Hospital[];
+  templates: ShiftTemplate[];
   filteredHospitalId?: string;
   onSelectDate: (date: string) => void;
+  onQuickAssignShift?: (
+    date: string,
+    hospitalId: string,
+    templateCode: ShiftCode,
+    resolution: 'create' | 'replace' | 'keep_both' | 'mark_collision'
+  ) => void;
+}
+
+interface CollisionDialogState {
+  date: string;
+  newHospitalId: string;
+  newHospitalName: string;
+  newTemplateCode: ShiftCode;
+  newTime: string;
+  existingTitle: string;
+  existingHospitalName: string;
+  existingTime: string;
 }
 
 export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
   days,
   shifts,
   hospitals,
+  templates,
   filteredHospitalId = 'all',
   onSelectDate,
+  onQuickAssignShift,
 }) => {
+  // Quick Painter Mode states
+  const [isQuickMode, setIsQuickMode] = useState(false);
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string>(() => hospitals[0]?.id || 'hosp-bendana');
+  const [selectedTemplateCode, setSelectedTemplateCode] = useState<ShiftCode>('TA');
+  const [collisionDialog, setCollisionDialog] = useState<CollisionDialogState | null>(null);
+
   // Apply hospital filter if selected
   const activeShifts = filteredHospitalId === 'all'
     ? shifts
@@ -33,8 +62,213 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
     shiftsByDate[shift.date].push(shift);
   });
 
+  const activeHosp = hospitals.find((h) => h.id === selectedHospitalId) || hospitals[0];
+  const activeHospColor = activeHosp?.color || activeHosp?.gradientStart || '#0d9488';
+  const activeShiftColor = getShiftColor(selectedTemplateCode, templates);
+  const activeTpl = templates.find((t) => t.code === selectedTemplateCode);
+
+  const handleDayClick = (dayItem: CalendarDayItem) => {
+    if (!isQuickMode) {
+      onSelectDate(dayItem.date);
+      return;
+    }
+
+    if (!onQuickAssignShift) {
+      onSelectDate(dayItem.date);
+      return;
+    }
+
+    const allDayShifts = shifts.filter((s) => s.date === dayItem.date);
+    const targetHosp = hospitals.find((h) => h.id === selectedHospitalId) || hospitals[0];
+    const targetTpl = templates.find((t) => t.code === selectedTemplateCode);
+
+    const newStartTime = targetTpl?.defaultStartTime || '07:00';
+    const newEndTime = targetTpl?.defaultEndTime || '15:00';
+    const newHours = targetTpl?.defaultHours || 8;
+
+    // 1. Check if exact same shift already exists on this day in same hospital
+    const exactMatch = allDayShifts.find((s) => s.hospitalId === selectedHospitalId && s.shiftCode === selectedTemplateCode);
+    if (exactMatch) {
+      // Toggle off / delete on tap
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try { navigator.vibrate(20); } catch { /* ignore */ }
+      }
+      onQuickAssignShift(dayItem.date, selectedHospitalId, selectedTemplateCode, 'create');
+      return;
+    }
+
+    // 2. Intelligent Conflict / Overlap Detection
+    // Check if there is an overlapping shift on this date using real time intervals
+    const newTimeSpan = {
+      startTime: newStartTime,
+      endTime: newEndTime,
+      hours: newHours,
+      shiftCode: selectedTemplateCode,
+    };
+
+    const conflictShift = allDayShifts.find((existing) => {
+      return doShiftsOverlap(newTimeSpan, {
+        startTime: existing.startTime,
+        endTime: existing.endTime,
+        hours: existing.hours,
+        shiftCode: existing.shiftCode,
+      });
+    });
+
+    if (conflictShift) {
+      // THERE IS AN ACTUAL TIME OVERLAP/COLLISION! Show conflict resolution modal
+      const existingHosp = getHospitalForShift(conflictShift, hospitals);
+      setCollisionDialog({
+        date: dayItem.date,
+        newHospitalId: selectedHospitalId,
+        newHospitalName: targetHosp?.shortName || targetHosp?.name || 'Centro',
+        newTemplateCode: selectedTemplateCode,
+        newTime: `${newStartTime} - ${newEndTime}`,
+        existingTitle: conflictShift.title || conflictShift.shiftCode,
+        existingHospitalName: existingHosp?.shortName || existingHosp?.name || 'Otro Centro',
+        existingTime: `${conflictShift.startTime} - ${conflictShift.endTime}`,
+      });
+      return;
+    }
+
+    // 3. NO CONFLICT! Different non-overlapping hours (e.g. TA in Hosp 1 + TB in Hosp 2)
+    // Add directly with gentle vibration feedback
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(30);
+      } catch {
+        // Ignore
+      }
+    }
+    onQuickAssignShift(dayItem.date, selectedHospitalId, selectedTemplateCode, 'create');
+  };
+
   return (
-    <div className="w-full bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+    <div className="w-full bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl relative">
+      {/* Quick Painter Mode Toggle Bar */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-900 border-b border-slate-800 gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-black text-slate-200 uppercase tracking-wider font-mono">
+            Calendario de Turnos
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsQuickMode(!isQuickMode)}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer min-h-[40px] ${
+            isQuickMode
+              ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-amber-500/25 ring-2 ring-amber-300'
+              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+          }`}
+          title="Modo rápido: selecciona lugar y turno, luego toca los días para asignarlo al instante"
+        >
+          <Paintbrush className="w-3.5 h-3.5" />
+          <span>{isQuickMode ? 'Modo Rápido: ACTIVO' : '🖌️ Modo Asignación Rápida'}</span>
+        </button>
+      </div>
+
+      {/* Quick Painter Toolbar (Visible when isQuickMode is active) */}
+      {isQuickMode && (
+        <div className="p-3 sm:p-4 bg-slate-950/95 border-b border-amber-500/40 space-y-3 shadow-xl animate-in fade-in duration-200">
+          {/* 1. Selector de Lugar (Centros con color sólido) */}
+          <div className="space-y-1">
+            <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider font-mono block">
+              1. Selecciona Centro de Trabajo:
+            </span>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-none">
+              {hospitals.map((hosp) => {
+                const isSel = selectedHospitalId === hosp.id;
+                const hospColor = hosp.color || hosp.gradientStart || '#0d9488';
+                return (
+                  <button
+                    key={hosp.id}
+                    type="button"
+                    onClick={() => setSelectedHospitalId(hosp.id)}
+                    className={`min-h-[42px] px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 transition-all border ${
+                      isSel
+                        ? 'text-white border-white shadow-lg ring-2 ring-white scale-102 font-black'
+                        : 'text-slate-300 bg-slate-900 border-slate-800 hover:text-white'
+                    }`}
+                    style={{
+                      backgroundColor: isSel ? hospColor : undefined,
+                    }}
+                  >
+                    <span className="text-base">{hosp.emoji || '🏥'}</span>
+                    <span>{hosp.shortName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. Selector de Turno (Colores de plantillas) */}
+          <div className="space-y-1">
+            <span className="text-[11px] font-bold text-teal-300 uppercase tracking-wider font-mono block">
+              2. Selecciona Turno a asignar:
+            </span>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
+              {templates.map((tpl) => {
+                const isSel = selectedTemplateCode === tpl.code;
+                const shiftColor = getShiftColor(tpl.code, templates);
+                return (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => setSelectedTemplateCode(tpl.code)}
+                    className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all border ${
+                      isSel
+                        ? 'text-white border-white shadow-lg ring-2 ring-white scale-105 font-black'
+                        : 'text-slate-300 bg-slate-900 border-slate-800 hover:text-white'
+                    }`}
+                    style={{
+                      backgroundColor: isSel ? shiftColor : undefined,
+                    }}
+                  >
+                    {tpl.code === 'CHOQUE' ? '⚠️ Choque' : tpl.name || tpl.code}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Banner de Previsualización de Fusión de Colores */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-900/90 border border-amber-500/30 text-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* Tarjeta de previsualización con degradado de fusión */}
+              <div
+                className="px-3 py-1.5 rounded-xl text-white font-bold text-xs shadow-md border border-white/20 shrink-0"
+                style={{
+                  background: `linear-gradient(135deg, ${activeHospColor} 0%, ${activeShiftColor} 100%)`,
+                }}
+              >
+                <div className="flex items-center gap-1.5 font-mono">
+                  <span>{selectedTemplateCode}</span>
+                  <span className="text-[10px] font-sans font-normal opacity-90">{activeHosp?.emoji || '🏥'} {activeHosp?.shortName}</span>
+                </div>
+              </div>
+
+              <div className="min-w-0 leading-tight">
+                <p className="text-slate-200 font-bold">
+                  Toca cualquier día en el calendario para pintar este turno.
+                </p>
+                <p className="text-[11px] text-slate-400 truncate">
+                  Si no choca en horas con otro turno, se agrega automáticamente sumando horas.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsQuickMode(false)}
+              className="self-end sm:self-auto text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 cursor-pointer min-h-[36px] flex items-center gap-1"
+            >
+              <span>✕ Salir de Modo Rápido</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Weekday headers */}
       <div className="grid grid-cols-7 border-b border-slate-800 bg-slate-900 text-center">
         {SPANISH_WEEKDAYS.map((wd, i) => (
@@ -56,6 +290,11 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
           // A day is a full-day off if it has a shift with shiftCode 'L' that was created as a full day off
           const isWholeDayLibre = allDayShifts.length > 0 && allDayShifts.every((s) => s.shiftCode === 'L' || s.title.toLowerCase().includes('descanso') || s.title.toLowerCase().includes('libre total'));
           
+          // Detect unresolved collision/conflict on this day using doShiftsOverlap
+          const dayHasCollision = allDayShifts.some((s) => isShiftCollision(s.shiftCode) || s.isCollision) ||
+            (allDayShifts.filter((s) => !isShiftLibre(s.shiftCode)).length >= 2 &&
+             allDayShifts.filter((s) => !isShiftLibre(s.shiftCode)).some((a, i, arr) => arr.some((b, j) => i !== j && doShiftsOverlap(a, b))));
+
           // Day shifts to display as cards
           const dayShifts = isWholeDayLibre
             ? []
@@ -72,9 +311,11 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
           return (
             <div
               key={dayItem.date}
-              onClick={() => onSelectDate(dayItem.date)}
+              onClick={() => handleDayClick(dayItem)}
               className={`min-h-[125px] sm:min-h-[135px] p-1 sm:p-1.5 flex flex-col justify-between transition-all cursor-pointer relative group ${
-                dayItem.isToday
+                dayHasCollision
+                  ? 'ring-2 ring-inset ring-red-500 bg-red-950/30'
+                  : dayItem.isToday
                   ? 'samsung-today-edge'
                   : is24H
                   ? 'ring-2 ring-inset ring-amber-500/70 bg-amber-950/25 animate-pulse'
@@ -91,7 +332,9 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
               <div className="flex items-center justify-between gap-1 mb-1">
                 <span
                   className={`text-xs font-bold w-6 h-6 rounded-lg flex items-center justify-center font-mono ${
-                    dayItem.isToday
+                    dayHasCollision
+                      ? 'bg-red-500 text-white font-black shadow-md'
+                      : dayItem.isToday
                       ? 'bg-teal-500 text-slate-950 shadow-md font-extrabold shadow-teal-500/30'
                       : dayItem.isCurrentMonth
                       ? 'text-slate-200'
@@ -101,9 +344,17 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                   {dayItem.dayNumber}
                 </span>
 
-                {/* Day status badge (e.g. 24H or total hours) */}
+                {/* Day status badge */}
                 <div className="flex items-center gap-1">
-                  {is24H ? (
+                  {dayHasCollision ? (
+                    <span
+                      className="px-1.5 py-0.5 rounded text-[10px] font-black font-mono text-red-100 bg-red-600 border border-red-400 shadow-sm animate-pulse flex items-center gap-0.5"
+                      title="¡Conflicto de horario / Choque entre turnos!"
+                    >
+                      <AlertTriangle className="w-3 h-3" />
+                      CHOQUE
+                    </span>
+                  ) : is24H ? (
                     <span
                       className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono text-amber-200 bg-amber-500/25 border border-amber-500/40 shadow-sm"
                       title="¡Jornada de 24 horas continuas trabajadas!"
@@ -126,9 +377,9 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     </span>
                   ) : null}
 
-                  {/* Hover Quick Edit Icon */}
+                  {/* Hover icon */}
                   <span className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-teal-300 p-0.5 rounded">
-                    <Plus className="w-3.5 h-3.5" />
+                    {isQuickMode ? <Paintbrush className="w-3.5 h-3.5 text-amber-400" /> : <Plus className="w-3.5 h-3.5" />}
                   </span>
                 </div>
               </div>
@@ -146,34 +397,39 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                 <div className="flex-1 space-y-1.5 overflow-hidden">
                   {dayShifts.slice(0, 3).map((shift, idx) => {
                     const hosp = getHospitalForShift(shift, hospitals);
-                    const gradStart = hosp?.gradientStart || hosp?.color || '#0d9488';
-                    const gradEnd = hosp?.gradientEnd || '#059669';
+                    const workplaceColor = hosp?.color || hosp?.gradientStart || '#0d9488';
+                    const shiftColor = getShiftColor(shift.shiftCode, templates);
 
                     const displayCode = getShiftDisplayCode(shift.shiftCode);
                     const hospShortName = hosp?.shortName || hosp?.name || 'Centro';
                     const isLibreShift = isShiftLibre(shift.shiftCode);
+                    const isCollisionShift = isShiftCollision(shift.shiftCode) || shift.isCollision;
 
                     return (
                       <div
                         key={shift.id || idx}
                         className={`rounded-lg px-1.5 py-1 shadow-md flex flex-col justify-center border transition-transform hover:scale-[1.02] ${
-                          isLibreShift
+                          isCollisionShift
+                            ? 'border-red-400 ring-1 ring-red-400 text-white animate-pulse'
+                            : isLibreShift
                             ? 'border-emerald-500/40 text-emerald-200'
                             : 'border-white/20 text-white'
                         }`}
                         style={{
-                          background: isLibreShift
-                            ? `linear-gradient(135deg, ${gradStart}33, #064e3b99)`
-                            : `linear-gradient(135deg, ${gradStart}, ${gradEnd})`,
+                          background: isCollisionShift
+                            ? 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)'
+                            : isLibreShift
+                            ? `linear-gradient(135deg, ${workplaceColor}44 0%, #064e3b99 100%)`
+                            : `linear-gradient(135deg, ${workplaceColor} 0%, ${shiftColor} 100%)`,
                         }}
                         title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${isLibreShift ? '0h (Libre)' : `${shift.hours}h`}${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                       >
-                        {/* Línea 1: Turno grande y legible (e.g. TA, TB, TC, 24H, TA-TB, LIBRE) */}
+                        {/* Línea 1: Turno grande y legible con indicador */}
                         <div className="flex items-center justify-between gap-1 leading-none font-mono">
                           <span className={`font-black text-[11.5px] sm:text-[13px] tracking-wide drop-shadow ${
-                            isLibreShift ? 'text-emerald-300' : 'text-white'
+                            isCollisionShift ? 'text-white' : isLibreShift ? 'text-emerald-300' : 'text-white'
                           }`}>
-                            {displayCode}
+                            {isCollisionShift ? '⚠️ CHOQUE' : displayCode}
                           </span>
                           {isLibreShift ? (
                             <span className="text-[8px] font-sans font-bold bg-emerald-950/80 text-emerald-400 px-1 py-0.2 rounded border border-emerald-500/30">
@@ -189,11 +445,12 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                           ) : null}
                         </div>
 
-                        {/* Línea 2: Nombre abreviado del centro de trabajo */}
-                        <div className={`font-bold text-[9px] sm:text-[9.5px] leading-tight truncate mt-0.5 ${
-                          isLibreShift ? 'text-emerald-200/90' : 'text-white/95'
+                        {/* Línea 2: Nombre abreviado del centro + Emoticono */}
+                        <div className={`font-bold text-[9px] sm:text-[9.5px] leading-tight truncate mt-0.5 flex items-center gap-1 ${
+                          isCollisionShift ? 'text-white font-black' : isLibreShift ? 'text-emerald-200/90' : 'text-white/95'
                         }`}>
-                          {hospShortName}
+                          {hosp?.emoji && <span className="text-[10px] leading-none shrink-0">{hosp.emoji}</span>}
+                          <span className="truncate">{hospShortName}</span>
                         </div>
                       </div>
                     );
@@ -218,7 +475,6 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                         key={i}
                         className="w-1.5 h-1.5 rounded-full"
                         style={{ backgroundColor: h?.color || '#0d9488' }}
-                        title={`${h?.shortName}: ${s.hours}h`}
                       />
                     );
                   })}
@@ -228,6 +484,94 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
           );
         })}
       </div>
+
+      {/* Collision Resolution Modal (Shown when clicking in Quick Mode on conflicting shift) */}
+      {collisionDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-red-500/60 rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
+            <div className="flex items-center gap-2.5 text-rose-400 font-bold">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-100">¿Choque de Horario?</h3>
+                <p className="text-xs text-rose-300/80">Conflicto de horas en {formatFriendlyDate(collisionDialog.date)}</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-2 text-xs">
+              <p className="text-slate-300">
+                Ya tienes un turno en <strong className="text-white">{collisionDialog.existingHospitalName}</strong>:
+              </p>
+              <div className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-amber-300 font-mono font-bold flex items-center justify-between">
+                <span>{collisionDialog.existingTitle}</span>
+                <span>{collisionDialog.existingTime}</span>
+              </div>
+              <p className="text-slate-400 pt-1">
+                Y estás agregando un turno con horario solapado: <strong className="text-teal-300">{collisionDialog.newHospitalName} · {collisionDialog.newTemplateCode} ({collisionDialog.newTime})</strong>
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onQuickAssignShift?.(
+                    collisionDialog.date,
+                    collisionDialog.newHospitalId,
+                    collisionDialog.newTemplateCode,
+                    'mark_collision'
+                  );
+                  setCollisionDialog(null);
+                }}
+                className="w-full py-3 px-3 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-red-950/50 cursor-pointer min-h-[44px]"
+              >
+                <span>⚡ Marcar Choque (Alerta Roja)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onQuickAssignShift?.(
+                    collisionDialog.date,
+                    collisionDialog.newHospitalId,
+                    collisionDialog.newTemplateCode,
+                    'replace'
+                  );
+                  setCollisionDialog(null);
+                }}
+                className="w-full py-3 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer min-h-[44px]"
+              >
+                <span>🔄 Sobrescribir (Reemplazar existente)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onQuickAssignShift?.(
+                    collisionDialog.date,
+                    collisionDialog.newHospitalId,
+                    collisionDialog.newTemplateCode,
+                    'keep_both'
+                  );
+                  setCollisionDialog(null);
+                }}
+                className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer min-h-[44px]"
+              >
+                <span>➕ Mantener ambos turnos</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCollisionDialog(null)}
+                className="w-full py-2 text-center text-xs text-slate-400 hover:text-slate-200 cursor-pointer min-h-[36px]"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

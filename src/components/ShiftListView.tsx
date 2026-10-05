@@ -172,14 +172,14 @@ export const ShiftListView: React.FC<ShiftListViewProps> = ({
                         className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors cursor-pointer group"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          {/* Hospital badge with gradient */}
+                          {/* Hospital badge with solid color and emoji */}
                           <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-md font-mono font-bold text-xs"
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-md text-base font-bold"
                             style={{
-                              background: `linear-gradient(135deg, ${hosp?.gradientStart || '#0d9488'}, ${hosp?.gradientEnd || '#059669'})`,
+                              backgroundColor: hosp?.color || hosp?.gradientStart || '#0d9488',
                             }}
                           >
-                            <Building2 className="w-5 h-5" />
+                            {hosp?.emoji ? <span>{hosp.emoji}</span> : <Building2 className="w-5 h-5" />}
                           </div>
 
                           <div className="min-w-0 space-y-0.5">

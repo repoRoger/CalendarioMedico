@@ -15,7 +15,7 @@ import {
 } from './lib/storage';
 import {
   getMonthMatrix, getWeekDays, formatDateToIso, SPANISH_MONTHS,
-  getHondurasDate, getHondurasTodayIso, getHondurasTomorrowIso
+  getHondurasDate, getHondurasTodayIso, getHondurasTomorrowIso, isShiftLibre
 } from './lib/timeUtils';
 import { Header } from './components/Header';
 import { AppBottomNav, MainAppSection } from './components/AppBottomNav';
@@ -660,6 +660,55 @@ export default function App() {
     addNotification('success', 'Datos importados', 'Copia de seguridad restaurada correctamente.');
   };
 
+  const handleQuickAssignShift = (
+    date: string,
+    hospitalId: string,
+    templateCode: ShiftCode,
+    resolution: 'create' | 'replace' | 'keep_both' | 'mark_collision' = 'create'
+  ) => {
+    const tpl = templates.find((t) => t.code === templateCode) || DEFAULT_TEMPLATES.find((t) => t.code === templateCode);
+    const hosp = hospitals.find((h) => h.id === hospitalId) || hospitals[0];
+    if (!tpl || !hosp) return;
+
+    const dayShifts = shifts.filter((s) => s.date === date);
+    const isCollisionShift = templateCode === 'CHOQUE' || resolution === 'mark_collision';
+
+    const newShift: MedicalShift = {
+      id: `shift-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      date,
+      hospitalId: hosp.id,
+      shiftCode: isCollisionShift ? 'CHOQUE' : tpl.code,
+      title: isCollisionShift ? 'Choque de Turno' : tpl.name,
+      startTime: tpl.defaultStartTime,
+      endTime: tpl.defaultEndTime,
+      hours: isShiftLibre(tpl.code) ? 0 : tpl.defaultHours,
+      color: isCollisionShift ? '#dc2626' : (tpl.color || '#f59e0b'),
+      isNightShift: tpl.isNightShift,
+      isCollision: isCollisionShift,
+    };
+
+    let nextDayShifts: MedicalShift[] = [];
+
+    if (resolution === 'replace') {
+      nextDayShifts = [newShift];
+    } else if (resolution === 'mark_collision') {
+      const flaggedExisting = dayShifts.map((s) => ({ ...s, isCollision: true }));
+      nextDayShifts = [...flaggedExisting, newShift];
+    } else if (resolution === 'keep_both') {
+      nextDayShifts = [...dayShifts, newShift];
+    } else {
+      // Toggle if exact same shift already on this date
+      const exactMatch = dayShifts.find((s) => s.hospitalId === hosp.id && s.shiftCode === tpl.code);
+      if (exactMatch) {
+        nextDayShifts = dayShifts.filter((s) => s.id !== exactMatch.id);
+      } else {
+        nextDayShifts = [...dayShifts, newShift];
+      }
+    }
+
+    handleSaveDayShifts(date, nextDayShifts);
+  };
+
   // Month matrix & week calculations
   const monthDays = getMonthMatrix(currentYear, currentMonth);
   const weekDays = getWeekDays(currentDate);
@@ -675,6 +724,24 @@ export default function App() {
     hoursPerDayMap[s.date] = (hoursPerDayMap[s.date] || 0) + (s.hours || 0);
   });
   const month24hDaysCount = Object.values(hoursPerDayMap).filter((h) => h >= 24).length;
+
+  // GATEWAY SECURITY: If no active user session, show ONLY the Login modal / Gateway!
+  if (!user.isLoggedIn || !user.email) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 font-sans">
+        <LoginModal
+          isOpen={true}
+          onLoginGoogle={handleLoginGoogle}
+          onLoginWithPassword={handleLoginWithPassword}
+          onRegisterWithPassword={handleRegisterWithPassword}
+        />
+        <LedNotification
+          notifications={notifications}
+          onDismiss={dismissNotification}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans pb-28 sm:pb-32">
@@ -696,6 +763,7 @@ export default function App() {
           <ProximosView
             shifts={shifts}
             hospitals={hospitals}
+            templates={templates}
             user={user}
             onEditDay={(dateIso) => setSelectedDateForModal(dateIso)}
             onGoToCalendar={() => setActiveSection('calendario')}
@@ -858,6 +926,7 @@ export default function App() {
                   {/* Each hospital badge */}
                   {hospitals.map((hosp) => {
                     const isSelected = hospitalFilter === hosp.id;
+                    const hospColor = hosp.color || hosp.gradientStart || '#0d9488';
                     const hospHours = currentMonthShifts
                       .filter((s) => s.hospitalId === hosp.id)
                       .reduce((acc, s) => acc + (s.hours || 0), 0);
@@ -868,15 +937,15 @@ export default function App() {
                         onClick={() => setHospitalFilter(isSelected ? 'all' : hosp.id)}
                         className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold text-white flex items-center gap-2 transition-all active:scale-95 shadow-sm border ${
                           isSelected
-                            ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105 border-white'
+                            ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105 border-white font-bold'
                             : 'border-transparent opacity-85 hover:opacity-100 hover:scale-[1.02]'
                         }`}
                         style={{
-                          background: `linear-gradient(135deg, ${hosp.gradientStart}, ${hosp.gradientEnd})`,
+                          backgroundColor: hospColor,
                         }}
                         title={isSelected ? 'Clic para mostrar todos' : `Filtrar solo turnos de ${hosp.name}`}
                       >
-                        <Building2 className="w-3.5 h-3.5" />
+                        {hosp.emoji ? <span className="text-sm">{hosp.emoji}</span> : <Building2 className="w-3.5 h-3.5" />}
                         <span className="font-bold">{hosp.shortName}</span>
                         <span className="bg-black/25 px-1.5 py-0.2 rounded text-[10.5px] font-mono">
                           {hospHours}h
@@ -900,14 +969,16 @@ export default function App() {
               )}
             </div>
 
-            {/* Calendar Month View (Al darle clic a cualquier celda, se abre el modal para editar turnos) */}
+            {/* Calendar Month View */}
             {currentView === 'month' && (
               <CalendarMonthView
                 days={monthDays}
                 shifts={shifts}
                 hospitals={hospitals}
+                templates={templates}
                 filteredHospitalId={hospitalFilter}
                 onSelectDate={(date) => setSelectedDateForModal(date)}
+                onQuickAssignShift={handleQuickAssignShift}
               />
             )}
 
@@ -916,6 +987,7 @@ export default function App() {
                 days={weekDays}
                 shifts={shifts}
                 hospitals={hospitals}
+                templates={templates}
                 filteredHospitalId={hospitalFilter}
                 onSelectDate={(date) => setSelectedDateForModal(date)}
                 onPrevWeek={handlePrevDate}

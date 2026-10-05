@@ -2,14 +2,15 @@ import React from 'react';
 import {
   Plus, Clock, Moon, ShieldAlert, Building2, ChevronLeft, ChevronRight, Calendar
 } from 'lucide-react';
-import { CalendarDayItem, SPANISH_WEEKDAYS, formatFriendlyDate, SPANISH_MONTHS, getShiftDisplayCode, isShiftLibre } from '../lib/timeUtils';
-import { MedicalShift, Hospital } from '../types';
-import { getHospitalForShift } from '../lib/storage';
+import { CalendarDayItem, SPANISH_WEEKDAYS, formatFriendlyDate, SPANISH_MONTHS, getShiftDisplayCode, isShiftLibre, isShiftCollision } from '../lib/timeUtils';
+import { MedicalShift, Hospital, ShiftTemplate } from '../types';
+import { getHospitalForShift, getShiftColor } from '../lib/storage';
 
 interface CalendarWeekViewProps {
   days: CalendarDayItem[];
   shifts: MedicalShift[];
   hospitals: Hospital[];
+  templates?: ShiftTemplate[];
   filteredHospitalId?: string;
   onSelectDate: (date: string) => void;
   onPrevWeek?: () => void;
@@ -21,6 +22,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
   days,
   shifts,
   hospitals,
+  templates = [],
   filteredHospitalId = 'all',
   onSelectDate,
   onPrevWeek,
@@ -165,19 +167,34 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                 <div className="space-y-1.5">
                   {dayShifts.map((shift) => {
                     const hosp = getHospitalForShift(shift, hospitals);
+                    const workplaceColor = hosp?.color || hosp?.gradientStart || '#0d9488';
+                    const shiftColor = getShiftColor(shift.shiftCode, templates);
+                    const isCollisionShift = isShiftCollision(shift.shiftCode) || shift.isCollision;
+                    const isLibre = isShiftLibre(shift.shiftCode);
 
                     return (
                       <div
                         key={shift.id}
-                        className="p-2 rounded-xl text-white text-xs shadow-md space-y-1"
+                        className={`p-2 rounded-xl text-white text-xs shadow-md space-y-1 border ${
+                          isCollisionShift
+                            ? 'border-red-400 ring-1 ring-red-400 animate-pulse'
+                            : 'border-white/20'
+                        }`}
                         style={{
-                          background: `linear-gradient(135deg, ${hosp?.gradientStart || '#0d9488'}, ${hosp?.gradientEnd || '#059669'})`,
+                          background: isCollisionShift
+                            ? 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)'
+                            : isLibre
+                            ? `linear-gradient(135deg, ${workplaceColor}44 0%, #064e3b99 100%)`
+                            : `linear-gradient(135deg, ${workplaceColor} 0%, ${shiftColor} 100%)`,
                         }}
                       >
                         <div className="flex items-center justify-between gap-1 font-bold">
-                          <span className="truncate">{hosp?.shortName || hosp?.name || 'Centro'}</span>
+                          <span className="truncate flex items-center gap-1">
+                            {hosp?.emoji && <span className="text-[11px] leading-none shrink-0">{hosp.emoji}</span>}
+                            <span>{hosp?.shortName || hosp?.name || 'Centro'}</span>
+                          </span>
                           <span className="bg-black/25 px-1.5 py-0.5 rounded font-mono text-[10px]">
-                            {getShiftDisplayCode(shift.shiftCode)}
+                            {isCollisionShift ? '⚠️ CHOQUE' : getShiftDisplayCode(shift.shiftCode)}
                           </span>
                         </div>
 
@@ -187,7 +204,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                             {shift.startTime} - {shift.endTime}
                           </span>
                           <span className="font-bold">
-                            {isShiftLibre(shift.shiftCode) ? '0h' : `${shift.hours}h`}
+                            {isLibre ? '0h' : `${shift.hours}h`}
                           </span>
                         </div>
 

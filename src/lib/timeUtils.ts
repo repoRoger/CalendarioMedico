@@ -206,6 +206,8 @@ export function getShiftDisplayCode(code: string): string {
       return 'TC-TA';
     case '24H':
       return '24H';
+    case 'CHOQUE':
+      return 'Choque';
     case 'LIBRE_A':
       return 'Libre A';
     case 'LIBRE_B':
@@ -223,6 +225,12 @@ export function getShiftDisplayCode(code: string): string {
     default:
       return code || 'TA';
   }
+}
+
+export function isShiftCollision(codeOrTitle: string): boolean {
+  if (!codeOrTitle) return false;
+  const upper = codeOrTitle.trim().toUpperCase();
+  return upper === 'CHOQUE' || upper === 'COLIS' || upper === 'COLISION' || upper === 'CONFLICTO';
 }
 
 export function isShiftLibre(codeOrTitle: string): boolean {
@@ -244,6 +252,7 @@ export function isShiftLibre(codeOrTitle: string): boolean {
 export function getShiftDisplayName(codeOrTitle: string): string {
   const normalized = (codeOrTitle || '').trim();
   const upper = normalized.toUpperCase();
+  if (upper === 'CHOQUE' || upper === 'COLIS' || upper === 'COLISION') return 'Choque de Turno';
   if (upper === 'M' || upper === 'TA' || normalized.toLowerCase() === 'mañana') return 'TA';
   if (upper === 'T' || upper === 'TB' || normalized.toLowerCase() === 'tarde') return 'TB';
   if (upper === 'N' || upper === 'TC' || normalized.toLowerCase() === 'noche') return 'TC';
@@ -258,6 +267,54 @@ export function getShiftDisplayName(codeOrTitle: string): string {
   if (upper === 'L' || normalized.toLowerCase() === 'libre') return 'Libre total';
   if (upper === 'C' || normalized.toLowerCase() === 'cubrir') return 'Cubrir';
   return normalized;
+}
+
+export interface ShiftTimeSpan {
+  startTime: string; // 'HH:mm'
+  endTime: string;   // 'HH:mm'
+  hours?: number;
+  shiftCode?: string;
+}
+
+/**
+ * Determines whether two shifts have an overlapping working time interval on the same day.
+ * Returns false if either shift is a rest/free shift (Libre),
+ * or if they are contiguous without overlapping hours (e.g. 07:00-15:00 and 15:00-21:00).
+ */
+export function doShiftsOverlap(shiftA: ShiftTimeSpan, shiftB: ShiftTimeSpan): boolean {
+  if (isShiftLibre(shiftA.shiftCode || '') || isShiftLibre(shiftB.shiftCode || '')) {
+    return false;
+  }
+
+  // If either is 24H or has >= 24h, it occupies the entire day cycle
+  if (
+    (shiftA.hours && shiftA.hours >= 24) ||
+    shiftA.shiftCode === '24H' ||
+    (shiftB.hours && shiftB.hours >= 24) ||
+    shiftB.shiftCode === '24H'
+  ) {
+    return true;
+  }
+
+  const [s1H, s1M] = (shiftA.startTime || '07:00').split(':').map(Number);
+  const [e1H, e1M] = (shiftA.endTime || '15:00').split(':').map(Number);
+  const [s2H, s2M] = (shiftB.startTime || '07:00').split(':').map(Number);
+  const [e2H, e2M] = (shiftB.endTime || '15:00').split(':').map(Number);
+
+  const startMin1 = (s1H || 0) * 60 + (s1M || 0);
+  let durMin1 = ((e1H || 0) * 60 + (e1M || 0)) - startMin1;
+  if (durMin1 < 0) durMin1 += 24 * 60;
+  if (durMin1 === 0 && shiftA.startTime === shiftA.endTime) durMin1 = 24 * 60;
+  const endMin1 = startMin1 + durMin1;
+
+  const startMin2 = (s2H || 0) * 60 + (s2M || 0);
+  let durMin2 = ((e2H || 0) * 60 + (e2M || 0)) - startMin2;
+  if (durMin2 < 0) durMin2 += 24 * 60;
+  if (durMin2 === 0 && shiftB.startTime === shiftB.endTime) durMin2 = 24 * 60;
+  const endMin2 = startMin2 + durMin2;
+
+  // Overlap condition: max(start1, start2) < min(end1, end2)
+  return Math.max(startMin1, startMin2) < Math.min(endMin1, endMin2);
 }
 
 /**

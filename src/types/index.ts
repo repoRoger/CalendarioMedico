@@ -3,10 +3,11 @@ export interface Hospital {
   name: string;
   shortName: string;
   city: string;
-  color: string; // Base accent color
-  gradientStart: string; // e.g. '#0d9488'
-  gradientEnd: string;   // e.g. '#059669'
+  color: string; // Solid accent color (e.g. '#0d9488')
+  gradientStart?: string; // Optional fallback
+  gradientEnd?: string;   // Optional fallback
   badgeIcon: 'hospital' | 'cross' | 'stethoscope' | 'heart' | 'activity' | 'shield' | 'briefcase' | 'factory' | 'building' | 'star';
+  emoji?: string; // Custom emoji e.g. '🏥', '🏫', '💼', '🏭', '🩺', '📚'
   logoUrl?: string; // Optional custom image or data URL
   businessType?: string; // Custom type e.g. 'Hospital', 'Fábrica', 'Call Center', 'Seguridad'
   address?: string;
@@ -21,6 +22,7 @@ export type ShiftCode =
   | 'TB-TC'
   | 'TC-TA'
   | '24H'
+  | 'CHOQUE'
   | 'LIBRE_A'
   | 'LIBRE_B'
   | 'LIBRE_C'
@@ -42,6 +44,7 @@ export interface ShiftTemplate {
   defaultEndTime: string;
   defaultHours: number;
   description: string;
+  color?: string; // Specific hex color for this shift (e.g. #f59e0b)
   colorBadge: string;
   isNightShift?: boolean;
 }
@@ -60,6 +63,7 @@ export interface MedicalShift {
   notes?: string;
   isNightShift?: boolean;
   isSubstitute?: boolean; // Turno cubierto o cambio con colega
+  isCollision?: boolean;  // Conflicto de turno / choque entre dos centros
 }
 
 export interface UserSession {

@@ -124,12 +124,16 @@ export const WorkplacesListView: React.FC<WorkplacesListViewProps> = ({
                 {/* Left: Icon, Name & Info */}
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-md"
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-md text-xl font-bold"
                     style={{
-                      background: `linear-gradient(135deg, ${hosp.gradientStart || '#0d9488'}, ${hosp.gradientEnd || '#059669'})`,
+                      backgroundColor: hosp.color || hosp.gradientStart || '#0d9488',
                     }}
                   >
-                    <IconComp className="w-6 h-6" />
+                    {hosp.emoji ? (
+                      <span>{hosp.emoji}</span>
+                    ) : (
+                      <IconComp className="w-6 h-6" />
+                    )}
                   </div>
 
                   <div className="min-w-0 space-y-1">

@@ -73,9 +73,10 @@ export const SettingsListView: React.FC<SettingsListViewProps> = ({
             {/* Left: Code badge, Name & Info */}
             <div className="flex items-center gap-3.5 min-w-0">
               <div
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm border shadow-md shrink-0 ${getBadgeStyle(
-                  tpl.code
-                )}`}
+                className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-md shrink-0 border border-white/20"
+                style={{
+                  backgroundColor: tpl.color || '#0d9488',
+                }}
               >
                 {tpl.code}
               </div>
