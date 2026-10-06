@@ -353,51 +353,51 @@ export function getShiftMobileLabel(workplaceName: string, shiftCode: string): s
 
 /**
  * Returns dynamic Tailwind font classes for shift names based on character length.
- * Shorter names (<= 4 chars like 'TA', '24H', 'Libre') get larger, punchier text.
- * Longer names (e.g. 'Libre C', 'Guardia') get smoothly reduced font size to fit without truncation.
+ * Short names (<= 4 chars like 'TA', '24H', 'Libre') get prominent, punchy text (13-16px).
+ * Longer names (e.g. 'Libre C', 'Guardia') get smoothly adjusted font size to fit without truncation.
  */
 export function getDynamicShiftTextClass(text: string): string {
   const len = (text || '').trim().length;
   if (len <= 2) {
     // e.g. TA, TB, TC, 24, L, C, M, T, N
-    return 'text-[12px] sm:text-[13.5px] font-black tracking-tight leading-tight';
+    return 'text-[15px] sm:text-[16px] font-black tracking-tight leading-none';
   }
   if (len <= 4) {
     // e.g. 24H, TC-A, NOCH
-    return 'text-[11px] sm:text-[12px] font-black tracking-tight leading-tight';
+    return 'text-[13.5px] sm:text-[14.5px] font-black tracking-tight leading-none';
   }
   if (len <= 6) {
     // e.g. LibreC, Choque, Mañana
-    return 'text-[9.5px] sm:text-[10.5px] font-extrabold tracking-tight leading-tight';
+    return 'text-[12px] sm:text-[13px] font-extrabold tracking-tight leading-none';
   }
-  if (len <= 8) {
+  if (len <= 9) {
     // e.g. Libre C, Guardia, Turno B
-    return 'text-[8.5px] sm:text-[9.5px] font-bold tracking-tight leading-tight';
+    return 'text-[10.5px] sm:text-[11.5px] font-bold tracking-tight leading-tight';
   }
-  // > 8 chars (e.g. Libre Turno, Guardia 24H, Emergencias)
-  return 'text-[7.5px] sm:text-[8.5px] font-bold tracking-tighter leading-none';
+  // > 9 chars (e.g. Libre Turno, Guardia 24H, Emergencias)
+  return 'text-[9.5px] sm:text-[10px] font-bold tracking-tighter leading-tight';
 }
 
 /**
  * Returns dynamic Tailwind font classes for workplace/hospital names based on character length.
- * Shorter names (<= 4 chars like 'Bend', 'Cata', 'IHSS') get larger text.
+ * Shorter names (<= 4 chars like 'Bend', 'Cata', 'IHSS') get larger text (12-13px).
  * Longer names get smoothly reduced font size so the whole name remains readable.
  */
 export function getDynamicHospitalTextClass(text: string): string {
   const len = (text || '').trim().length;
   if (len <= 4) {
     // e.g. Bend, Cata, IHSS, Util, Hosp, H1
-    return 'text-[10.5px] sm:text-[11.5px] font-extrabold tracking-tight leading-tight';
+    return 'text-[12px] sm:text-[13px] font-black tracking-tight leading-none';
   }
   if (len <= 6) {
     // e.g. CEMESA, San Ra, Hosp 1
+    return 'text-[11px] sm:text-[12px] font-extrabold tracking-tight leading-none';
+  }
+  if (len <= 9) {
+    // e.g. Bendaña, Catarino, Clinica
     return 'text-[9.5px] sm:text-[10.5px] font-bold tracking-tight leading-tight';
   }
-  if (len <= 8) {
-    // e.g. Bendaña, Catarino, Clinica
-    return 'text-[8.5px] sm:text-[9.5px] font-semibold tracking-tight leading-tight';
-  }
-  // > 8 chars (e.g. Leonardo Martinez, Hospital Regional)
-  return 'text-[7.5px] sm:text-[8.5px] font-semibold tracking-tighter leading-none';
+  // > 9 chars (e.g. Leonardo Martinez, Hospital Regional)
+  return 'text-[8.5px] sm:text-[9.5px] font-semibold tracking-tighter leading-none';
 }
 

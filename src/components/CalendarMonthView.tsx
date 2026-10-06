@@ -449,10 +449,12 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     const shiftTextColor = getContrastTextColor(shiftColor);
 
                     const shiftTemplate = templates.find((t) => t.code === shift.shiftCode);
-                    const shiftDisplayName = shiftTemplate?.name || shift.title || getShiftDisplayCode(shift.shiftCode, templates);
-                    const hospShortName = hosp?.shortName || hosp?.name || 'Centro';
                     const isLibreShift = isShiftLibre(shift.shiftCode);
                     const isCollisionShift = isShiftCollision(shift.shiftCode) || shift.isCollision;
+                    const shiftDisplayName = isCollisionShift
+                      ? '⚠️ Choque'
+                      : (shiftTemplate?.name || getShiftDisplayCode(shift.shiftCode, templates) || shift.title || shift.shiftCode || 'TA');
+                    const hospShortName = hosp?.shortName || hosp?.name || 'Centro';
 
                     return (
                       <div
