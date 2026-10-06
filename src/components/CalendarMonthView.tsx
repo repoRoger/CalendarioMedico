@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Plus, Clock, Moon, Sparkles, Building2, Paintbrush, AlertTriangle, Check, RefreshCw, X, ShieldAlert } from 'lucide-react';
 import {
   CalendarDayItem, SPANISH_WEEKDAYS, getShiftDisplayCode, getShiftMobileLabel,
-  isShiftLibre, isShiftCollision, formatFriendlyDate, doShiftsOverlap, getContrastTextColor
+  isShiftLibre, isShiftCollision, formatFriendlyDate, doShiftsOverlap, getContrastTextColor,
+  getDynamicShiftTextClass, getDynamicHospitalTextClass
 } from '../lib/timeUtils';
 import { MedicalShift, Hospital, ShiftTemplate, ShiftCode } from '../types';
 import { getHospitalForShift, getShiftColor } from '../lib/storage';
@@ -283,13 +284,13 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
               >
                 {/* Fila 1: Turno */}
                 <div className="flex items-center justify-start leading-none min-w-0">
-                  <span className="font-black text-[10.5px] font-mono tracking-tight truncate leading-none drop-shadow-sm">
+                  <span className={`${getDynamicShiftTextClass(activeTpl?.name || selectedTemplateCode)} font-mono truncate leading-none drop-shadow-sm`}>
                     {activeTpl?.name || selectedTemplateCode}
                   </span>
                 </div>
                 {/* Fila 2: Centro */}
                 <div className="min-w-0 leading-tight">
-                  <span className="font-extrabold text-[10px] opacity-90 tracking-tight truncate block drop-shadow-sm">
+                  <span className={`${getDynamicHospitalTextClass(activeHosp?.shortName || 'Centro')} opacity-90 truncate block drop-shadow-sm`}>
                     {activeHosp?.shortName || 'Centro'}
                   </span>
                 </div>
@@ -467,16 +468,16 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                         }}
                         title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${isLibreShift ? '0h (Libre)' : `${shift.hours}h`}${shift.department ? ` · Área: ${shift.department}` : ''}${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                       >
-                        {/* Fila 1 (Arriba): Nombre del Turno */}
+                        {/* Fila 1 (Arriba): Nombre del Turno con tamaño dinámico */}
                         <div className="flex items-center justify-start leading-none min-w-0">
-                          <span className="font-black text-[10px] sm:text-[11px] font-mono tracking-tight truncate leading-none drop-shadow-sm">
+                          <span className={`${getDynamicShiftTextClass(isCollisionShift ? '⚠️ Choque' : shiftDisplayName)} font-mono truncate leading-none drop-shadow-sm`}>
                             {isCollisionShift ? '⚠️ Choque' : shiftDisplayName}
                           </span>
                         </div>
 
-                        {/* Fila 2 (Abajo): Nombre abreviado del centro */}
+                        {/* Fila 2 (Abajo): Nombre abreviado del centro con tamaño dinámico */}
                         <div className="min-w-0 leading-tight w-full">
-                          <span className="font-extrabold text-[9.5px] sm:text-[10.5px] opacity-90 truncate block drop-shadow-sm">
+                          <span className={`${getDynamicHospitalTextClass(hospShortName)} opacity-90 truncate block drop-shadow-sm`}>
                             {hospShortName}
                           </span>
                         </div>
