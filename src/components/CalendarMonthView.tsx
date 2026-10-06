@@ -370,7 +370,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
             <div
               key={dayItem.date}
               onClick={() => handleDayClick(dayItem)}
-              className={`min-h-[125px] sm:min-h-[135px] p-1 sm:p-1.5 flex flex-col justify-between transition-all cursor-pointer relative group ${
+              className={`min-h-[125px] sm:min-h-[135px] p-0.5 sm:p-1.5 flex flex-col justify-between transition-all cursor-pointer relative group ${
                 dayHasCollision
                   ? 'ring-2 ring-inset ring-red-500 bg-red-950/30'
                   : dayItem.isToday
@@ -465,13 +465,13 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                       ? '⚠️ Choque'
                       : (shiftTemplate?.name || getShiftDisplayCode(shift.shiftCode, templates) || shift.title || shift.shiftCode || 'TA');
                     const hospShortName = hosp?.shortName || hosp?.name || 'Centro';
-                    const shiftFontSize = getAutoFitFontSize(shiftDisplayName, 15.5, 8.5, 42);
-                    const hospFontSize = getAutoFitFontSize(hospShortName, 13.5, 8, 42);
+                    const shiftFontSize = getAutoFitFontSize(shiftDisplayName, true);
+                    const hospFontSize = getAutoFitFontSize(hospShortName, false);
 
                     return (
                       <div
                         key={shift.id || idx}
-                        className={`rounded-lg py-0.5 px-1 sm:py-1 sm:px-1 shadow-sm flex flex-col justify-center items-center text-center gap-0.5 transition-all hover:scale-[1.02] relative overflow-hidden border border-black/20 ${
+                        className={`rounded-lg py-0.5 px-0.5 sm:py-1 sm:px-1 shadow-sm flex flex-col justify-center items-center text-center gap-0.5 transition-all hover:scale-[1.02] relative overflow-hidden border border-black/20 ${
                           isCollisionShift
                             ? 'ring-1 ring-red-400/80'
                             : ''
@@ -485,7 +485,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                         {/* Fila 1 (Arriba): Nombre del Turno Centrado y Auto-ajustado */}
                         <div className="w-full flex items-center justify-center text-center leading-none overflow-hidden">
                           <span
-                            className="font-black font-mono tracking-tight text-center truncate block leading-none drop-shadow-sm"
+                            className="font-black font-sans tracking-tight text-center truncate block leading-none drop-shadow-sm"
                             style={{
                               fontSize: `${shiftFontSize}px`,
                             }}
@@ -497,7 +497,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                         {/* Fila 2 (Abajo): Nombre abreviado del centro Centrado y Auto-ajustado */}
                         <div className="w-full flex items-center justify-center text-center leading-tight overflow-hidden">
                           <span
-                            className="font-extrabold tracking-tight opacity-90 text-center truncate block leading-tight drop-shadow-sm"
+                            className="font-extrabold font-sans tracking-tight opacity-90 text-center truncate block leading-tight drop-shadow-sm"
                             style={{
                               fontSize: `${hospFontSize}px`,
                             }}

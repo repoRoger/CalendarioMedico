@@ -379,32 +379,32 @@ export function getDynamicShiftTextClass(text: string): string {
 }
 
 /**
- * Calculates a precise automatic font size in pixels for text to fit within a target container width.
- * Analyzes character glyph weights (narrow letters like 'i', 'l', '1' vs wide like 'M', 'W', 'Ñ').
- * Ensures short text (e.g. 'TA', 'IHSS', '24H') expands up to maxPx,
- * and longer text (e.g. 'Bendaña', 'Catarino') smoothly scales down so it never gets clipped.
+ * Calculates a precise automatic font size in pixels for text inside month calendar cards.
+ * Short text ('TA', '24H', 'IHSS') is large (12.5-14.5px).
+ * Medium text ('LibreC', 'Choque', 'CEMESA') is 9.8-10.5px so it NEVER gets truncated.
+ * Long text ('Bendaña', 'Catarino', 'Libre C') is 8.5-9.0px so all letters display completely.
  */
-export function getAutoFitFontSize(text: any, maxPx = 15, minPx = 7.5, targetWidth = 38): number {
-  if (text === null || text === undefined) return maxPx;
+export function getAutoFitFontSize(text: any, isTitle = false): number {
+  if (text === null || text === undefined) return isTitle ? 14 : 11;
   const clean = String(text).trim();
-  if (clean.length === 0) return maxPx;
+  const len = clean.length;
+  if (len === 0) return isTitle ? 14 : 11;
 
-  let totalUnits = 0;
-  for (let i = 0; i < clean.length; i++) {
-    const char = clean[i];
-    if ('ijlI1!:;.,|/\''.includes(char)) {
-      totalUnits += 0.28;
-    } else if ('mwMWÑñ%@&'.includes(char)) {
-      totalUnits += 0.74;
-    } else if ('tfjkr- ()'.includes(char)) {
-      totalUnits += 0.38;
-    } else {
-      totalUnits += 0.52;
-    }
+  if (isTitle) {
+    // For Shift Name (Turno)
+    if (len <= 2) return 14.5;   // 'TA', 'TB', 'TC', 'L', 'C'
+    if (len <= 4) return 12.5;   // '24H', 'TC-A'
+    if (len <= 6) return 9.8;    // 'LibreC', 'Choque', 'Mañana'
+    if (len <= 8) return 8.6;    // 'Libre C', 'Guardia'
+    if (len <= 10) return 7.8;   // 'LibreTurno'
+    return 7.0;                  // Very long names
+  } else {
+    // For Hospital / Workplace Name (Centro)
+    if (len <= 4) return 12.5;   // 'IHSS', 'Bend', 'Cata', 'Util'
+    if (len <= 6) return 10.2;   // 'CEMESA', 'San Ra'
+    if (len <= 8) return 8.6;    // 'Bendaña', 'Catarino'
+    if (len <= 10) return 7.8;   // 'San Rafael'
+    return 7.0;                  // Very long workplace names
   }
-
-  // Calculate proportional font size in pixels
-  const calculated = Math.floor((targetWidth / Math.max(totalUnits, 1)) * 10) / 10;
-  return Math.min(maxPx, Math.max(minPx, calculated));
 }
 
