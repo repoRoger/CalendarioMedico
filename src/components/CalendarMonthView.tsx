@@ -274,16 +274,11 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs">
             <div className="flex items-center gap-2.5 min-w-0">
               {/* Tarjeta de previsualización 2 filas */}
-              <div className="relative pl-3 pr-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-center gap-0.5 shadow-sm overflow-hidden shrink-0 min-w-[90px]">
-                {/* Barra lateral */}
-                <div
-                  className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl"
-                  style={{ backgroundColor: activeHospColor }}
-                />
+              <div className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-center gap-0.5 shadow-sm overflow-hidden shrink-0 min-w-[85px]">
                 {/* Fila 1: Turno */}
-                <div className="flex items-center justify-start leading-none pl-0.5">
+                <div className="flex items-center justify-start leading-none">
                   <span
-                    className="px-1.5 py-0.5 rounded text-[10px] font-black font-mono shadow-sm border border-white/20"
+                    className="px-2 py-0.5 rounded text-[10.5px] font-black font-mono shadow-sm border border-white/20"
                     style={{
                       backgroundColor: activeShiftColor,
                       color: getContrastTextColor(activeShiftColor),
@@ -292,8 +287,8 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     {selectedTemplateCode}
                   </span>
                 </div>
-                {/* Fila 2: Centro (sin emoji) */}
-                <div className="min-w-0 leading-tight pl-0.5">
+                {/* Fila 2: Centro */}
+                <div className="min-w-0 leading-tight">
                   <span className="font-extrabold text-[11px] text-white tracking-tight truncate block drop-shadow-sm">
                     {activeHosp?.shortName || 'Centro'}
                   </span>
@@ -461,7 +456,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     return (
                       <div
                         key={shift.id || idx}
-                        className={`rounded-lg py-1 pl-2.5 pr-1.5 shadow-md flex flex-col justify-center gap-0.5 transition-all hover:scale-[1.02] relative overflow-hidden bg-slate-900 border ${
+                        className={`rounded-lg py-1 px-1.5 shadow-md flex flex-col justify-center gap-0.5 transition-all hover:scale-[1.02] relative overflow-hidden bg-slate-900 border ${
                           isCollisionShift
                             ? 'border-red-500/80 ring-1 ring-red-500/60 bg-red-950/40'
                             : isLibreShift
@@ -470,16 +465,9 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                         }`}
                         title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${isLibreShift ? '0h (Libre)' : `${shift.hours}h`}${shift.department ? ` · Área: ${shift.department}` : ''}${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                       >
-                        {/* Barra lateral izquierda del Centro de Trabajo (cubre las 2 filas) */}
-                        <div
-                          className="absolute left-0 top-0 bottom-0 w-1.5 shadow-sm"
-                          style={{
-                            backgroundColor: isCollisionShift ? '#ef4444' : workplaceColor,
-                          }}
-                        />
 
                         {/* Fila 1 (Arriba): Nombre y Color del Turno */}
-                        <div className="flex items-center justify-start leading-none pl-0.5">
+                        <div className="flex items-center justify-start leading-none">
                           <span
                             className="px-1.5 py-0.5 rounded text-[9.5px] sm:text-[10px] font-black font-mono shadow-sm shrink-0 border border-white/20 leading-none flex items-center gap-0.5"
                             style={{
@@ -496,7 +484,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                         </div>
 
                         {/* Fila 2 (Abajo): Nombre abreviado del centro (sin emoji ni color extra, sobre fondo oscuro) */}
-                        <div className="min-w-0 leading-tight pl-0.5">
+                        <div className="min-w-0 leading-tight w-full">
                           <span className="font-extrabold text-[10.5px] sm:text-[11.5px] text-white tracking-tight truncate block drop-shadow-sm">
                             {hospShortName}
                           </span>

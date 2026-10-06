@@ -441,8 +441,7 @@ export function getStoredTemplates(): ShiftTemplate[] {
       const defMatch = DEFAULT_TEMPLATES.find((dt) => dt.code === code);
       const userMatch = cleaned.find((t) => t.code === code);
       if (defMatch) {
-        // Keep the clean, modern name, color and timestamps from DEFAULT_TEMPLATES
-        result.push(userMatch ? { ...defMatch, ...userMatch, name: defMatch.name, color: userMatch.color || defMatch.color } : defMatch);
+        result.push(userMatch ? { ...defMatch, ...userMatch } : defMatch);
       } else if (userMatch) {
         result.push(userMatch);
       }

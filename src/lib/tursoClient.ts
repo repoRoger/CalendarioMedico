@@ -101,8 +101,28 @@ export async function initializeTursoTables(client: Client): Promise<void> {
       inicio_defecto TEXT NOT NULL,
       fin_defecto TEXT NOT NULL,
       horas_defecto REAL NOT NULL,
+      color TEXT,
+      color_badge TEXT,
+      descripcion TEXT,
       es_nocturno INTEGER DEFAULT 0
     )
+  `);
+
+  // Migrations for plantillas_turnos
+  try {
+    await client.execute(`ALTER TABLE plantillas_turnos ADD COLUMN color TEXT`);
+  } catch {}
+  try {
+    await client.execute(`ALTER TABLE plantillas_turnos ADD COLUMN color_badge TEXT`);
+  } catch {}
+  try {
+    await client.execute(`ALTER TABLE plantillas_turnos ADD COLUMN descripcion TEXT`);
+  } catch {}
+
+  // Index on cliente_correo for plantillas
+  await client.execute(`
+    CREATE INDEX IF NOT EXISTS idx_plantillas_usuario 
+    ON plantillas_turnos(cliente_correo)
   `);
 
   // Table: usuarios (guarda datos de perfil, contraseña y foto_blob directamente en Turso sin R2)
@@ -167,9 +187,10 @@ export async function fetchTemplatesFromTurso(
   clienteCorreo: string
 ): Promise<ShiftTemplate[]> {
   try {
+    const email = clienteCorreo.trim().toLowerCase();
     const result = await client.execute({
       sql: `SELECT * FROM plantillas_turnos WHERE cliente_correo = ?`,
-      args: [clienteCorreo.trim().toLowerCase()],
+      args: [email],
     });
 
     if (result.rows.length === 0) {
@@ -183,13 +204,80 @@ export async function fetchTemplatesFromTurso(
       defaultStartTime: String(row.inicio_defecto),
       defaultEndTime: String(row.fin_defecto),
       defaultHours: Number(row.horas_defecto),
-      description: String(row.nombre),
-      colorBadge: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+      description: row.descripcion ? String(row.descripcion) : String(row.nombre),
+      color: row.color ? String(row.color) : undefined,
+      colorBadge: row.color_badge ? String(row.color_badge) : 'bg-teal-500/20 text-teal-300 border-teal-500/30',
       isNightShift: Boolean(row.es_nocturno),
     }));
   } catch (err) {
     console.warn('Error fetching templates from Turso:', err);
     return [];
+  }
+}
+
+/**
+ * Initializes a full isolated copy of default templates for a user in Turso if they have none.
+ */
+export async function initializeDefaultTemplatesForUser(
+  client: Client,
+  clienteCorreo: string,
+  defaultTemplates: ShiftTemplate[]
+): Promise<ShiftTemplate[]> {
+  const email = clienteCorreo.trim().toLowerCase();
+  try {
+    await initializeTursoTables(client);
+
+    const existing = await fetchTemplatesFromTurso(client, email);
+    if (existing && existing.length > 0) {
+      return existing;
+    }
+
+    // Clone default templates with user-scoped IDs
+    const userTemplates: ShiftTemplate[] = defaultTemplates.map((t) => ({
+      ...t,
+      id: `${email}__${t.id || `tpl-${t.code.toLowerCase()}`}`,
+    }));
+
+    for (const t of userTemplates) {
+      try {
+        await client.execute({
+          sql: `
+            INSERT INTO plantillas_turnos (id, cliente_correo, codigo, nombre, inicio_defecto, fin_defecto, horas_defecto, color, color_badge, descripcion, es_nocturno)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              codigo = excluded.codigo,
+              nombre = excluded.nombre,
+              inicio_defecto = excluded.inicio_defecto,
+              fin_defecto = excluded.fin_defecto,
+              horas_defecto = excluded.horas_defecto,
+              color = excluded.color,
+              color_badge = excluded.color_badge,
+              descripcion = excluded.descripcion,
+              es_nocturno = excluded.es_nocturno
+          `,
+          args: [
+            t.id,
+            email,
+            t.code,
+            t.name,
+            t.defaultStartTime,
+            t.defaultEndTime,
+            t.defaultHours,
+            t.color || null,
+            t.colorBadge || null,
+            t.description || null,
+            t.isNightShift ? 1 : 0,
+          ],
+        });
+      } catch (err) {
+        console.warn('Error saving initial template for user in Turso:', t.code, err);
+      }
+    }
+
+    return userTemplates;
+  } catch (err) {
+    console.warn('Error initializing default templates for user:', err);
+    return defaultTemplates;
   }
 }
 
@@ -241,6 +329,7 @@ export async function syncLocalDataToTurso(
     // Save hospitals in batch (isolated to never block shifts)
     for (const h of hospitals) {
       try {
+        const hospId = h.id.startsWith(`${email}__`) ? h.id : `${email}__${h.id}`;
         await client.execute({
           sql: `
             INSERT INTO hospitales (id, cliente_correo, nombre, nombre_corto, tipo_negocio, ciudad, color, gradiente_inicio, gradiente_fin, icono_badge, logo_url)
@@ -257,7 +346,7 @@ export async function syncLocalDataToTurso(
               logo_url = excluded.logo_url
           `,
           args: [
-            h.id,
+            hospId,
             email,
             h.name,
             h.shortName,
@@ -277,10 +366,11 @@ export async function syncLocalDataToTurso(
 
     // Clean up any hospitals deleted locally for this user
     if (hospitals.length > 0) {
-      const hPlaceholders = hospitals.map(() => '?').join(',');
+      const hospScopedIds = hospitals.map((h) => h.id.startsWith(`${email}__`) ? h.id : `${email}__${h.id}`);
+      const hPlaceholders = hospScopedIds.map(() => '?').join(',');
       await client.execute({
         sql: `DELETE FROM hospitales WHERE cliente_correo = ? AND id NOT IN (${hPlaceholders})`,
-        args: [email, ...hospitals.map((h) => h.id)],
+        args: [email, ...hospScopedIds],
       });
     } else {
       await client.execute({
@@ -341,36 +431,57 @@ export async function syncLocalDataToTurso(
       });
     }
 
-    // Save templates for this user in Turso
+    // Save templates for this user in Turso (isolated per user)
     if (templates && templates.length > 0) {
-      for (const t of templates) {
+      const userScopedTemplates = templates.map((t) => ({
+        ...t,
+        id: t.id.startsWith(`${email}__`) ? t.id : `${email}__${t.id || `tpl-${t.code.toLowerCase()}`}`,
+      }));
+
+      for (const t of userScopedTemplates) {
         try {
           await client.execute({
             sql: `
-              INSERT INTO plantillas_turnos (id, cliente_correo, codigo, nombre, inicio_defecto, fin_defecto, horas_defecto, es_nocturno)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              INSERT INTO plantillas_turnos (id, cliente_correo, codigo, nombre, inicio_defecto, fin_defecto, horas_defecto, color, color_badge, descripcion, es_nocturno)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               ON CONFLICT(id) DO UPDATE SET
                 codigo = excluded.codigo,
                 nombre = excluded.nombre,
                 inicio_defecto = excluded.inicio_defecto,
                 fin_defecto = excluded.fin_defecto,
                 horas_defecto = excluded.horas_defecto,
+                color = excluded.color,
+                color_badge = excluded.color_badge,
+                descripcion = excluded.descripcion,
                 es_nocturno = excluded.es_nocturno
             `,
             args: [
-              t.id || `tpl-${t.code.toLowerCase()}`,
+              t.id,
               email,
               t.code,
               t.name,
               t.defaultStartTime,
               t.defaultEndTime,
               t.defaultHours,
+              t.color || null,
+              t.colorBadge || null,
+              t.description || null,
               t.isNightShift ? 1 : 0,
             ],
           });
         } catch (tErr) {
           console.warn('Error saving template to Turso:', t.code, tErr);
         }
+      }
+
+      // Delete templates removed by this user
+      if (userScopedTemplates.length > 0) {
+        const tPlaceholders = userScopedTemplates.map(() => '?').join(',');
+        const tIds = userScopedTemplates.map((t) => t.id);
+        await client.execute({
+          sql: `DELETE FROM plantillas_turnos WHERE cliente_correo = ? AND id NOT IN (${tPlaceholders})`,
+          args: [email, ...tIds],
+        });
       }
     }
 

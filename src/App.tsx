@@ -39,7 +39,7 @@ import { LedNotification, LedMessage } from './components/LedNotification';
 import {
   getTursoClient, syncLocalDataToTurso, saveUserProfileToTurso,
   fetchUserProfileFromTurso, fetchShiftsFromTurso, fetchHospitalsFromTurso,
-  fetchTemplatesFromTurso,
+  fetchTemplatesFromTurso, initializeDefaultTemplatesForUser,
   mergeShifts, mergeHospitals, deleteHospitalFromTurso,
   loginUserWithPassword, registerUserWithPassword
 } from './lib/tursoClient';
@@ -146,11 +146,12 @@ export default function App() {
       saveStoredHospitals(finalHospitals);
 
       // 3. TEMPLATES: Fetch remote templates for this user if available
-      const remoteTemplates = await fetchTemplatesFromTurso(client, user.email);
-      let finalTemplates = templates;
+      const remoteTemplates = await initializeDefaultTemplatesForUser(client, user.email, DEFAULT_TEMPLATES);
+      let finalTemplates = remoteTemplates;
       if (remoteTemplates && remoteTemplates.length > 0) {
         const orderedCodes: ShiftCode[] = [
           'TA', 'TB', 'TC', '24H',
+          'CHOQUE',
           'LIBRE_A', 'LIBRE_B', 'LIBRE_C', 'LIBRE', 'L',
           'TA-TB', 'TB-TC', 'TC-TA',
         ];
@@ -165,9 +166,9 @@ export default function App() {
           }
         });
         finalTemplates = sorted;
-        setTemplates(finalTemplates);
-        saveStoredTemplates(finalTemplates);
       }
+      setTemplates(finalTemplates);
+      saveStoredTemplates(finalTemplates);
 
       // 4. Keep Turso 100% updated with this consolidated authoritative dataset
       await syncLocalDataToTurso(client, user.email, finalShifts, finalHospitals, finalTemplates);
@@ -335,10 +336,11 @@ export default function App() {
     if (tursoConfig.databaseUrl && tursoConfig.authToken) {
       try {
         const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-        const [remoteProfile, remoteShifts, remoteHospitals] = await Promise.all([
+        const [remoteProfile, remoteShifts, remoteHospitals, remoteTemplates] = await Promise.all([
           fetchUserProfileFromTurso(client, cleanEmail),
           fetchShiftsFromTurso(client, cleanEmail),
           fetchHospitalsFromTurso(client, cleanEmail),
+          initializeDefaultTemplatesForUser(client, cleanEmail, DEFAULT_TEMPLATES),
         ]);
 
         if (remoteProfile) {
@@ -369,12 +371,16 @@ export default function App() {
         // New users start with 0 hospitals (not forced 3!)
         const finalShifts = remoteShifts || [];
         const finalHospitals = (remoteHospitals && remoteHospitals.length > 0) ? remoteHospitals : [];
+        const finalTemplates = (remoteTemplates && remoteTemplates.length > 0) ? remoteTemplates : DEFAULT_TEMPLATES;
 
         setShifts(finalShifts);
         saveStoredShifts(finalShifts);
 
         setHospitals(finalHospitals);
         saveStoredHospitals(finalHospitals);
+
+        setTemplates(finalTemplates);
+        saveStoredTemplates(finalTemplates);
 
         addNotification('success', 'Sesión iniciada con Google', `Bienvenido/a, ${activeUser.name}`);
       } catch (err: any) {
@@ -410,9 +416,10 @@ export default function App() {
       setShifts([]);
       setHospitals([]);
 
-      const [remoteShifts, remoteHospitals] = await Promise.all([
+      const [remoteShifts, remoteHospitals, remoteTemplates] = await Promise.all([
         fetchShiftsFromTurso(client, cleanEmail),
         fetchHospitalsFromTurso(client, cleanEmail),
+        initializeDefaultTemplatesForUser(client, cleanEmail, DEFAULT_TEMPLATES),
       ]);
 
       const activeUser: UserSession = {
@@ -431,12 +438,16 @@ export default function App() {
 
       const finalShifts = remoteShifts || [];
       const finalHospitals = (remoteHospitals && remoteHospitals.length > 0) ? remoteHospitals : [];
+      const finalTemplates = (remoteTemplates && remoteTemplates.length > 0) ? remoteTemplates : DEFAULT_TEMPLATES;
 
       setShifts(finalShifts);
       saveStoredShifts(finalShifts);
 
       setHospitals(finalHospitals);
       saveStoredHospitals(finalHospitals);
+
+      setTemplates(finalTemplates);
+      saveStoredTemplates(finalTemplates);
 
       setUser(activeUser);
       saveStoredUser(activeUser);
@@ -464,11 +475,15 @@ export default function App() {
         return { success: false, message: authRes.message || 'Error al crear la cuenta.' };
       }
 
-      // Brand new user starts with 0 shifts and 0 hospitals
+      // Brand new user starts with 0 shifts and 0 hospitals, and a fresh isolated copy of default templates
       setShifts([]);
       saveStoredShifts([]);
       setHospitals([]);
       saveStoredHospitals([]);
+
+      const userTemplates = await initializeDefaultTemplatesForUser(client, cleanEmail, DEFAULT_TEMPLATES);
+      setTemplates(userTemplates);
+      saveStoredTemplates(userTemplates);
 
       const activeUser: UserSession = {
         id: `usr-${Date.now()}`,
@@ -526,6 +541,8 @@ export default function App() {
     saveStoredShifts([]);
     setHospitals([]);
     saveStoredHospitals([]);
+    setTemplates(DEFAULT_TEMPLATES);
+    saveStoredTemplates(DEFAULT_TEMPLATES);
     addNotification('info', 'Sesión cerrada', 'Ingresa con tu correo de Google o contraseña para ver tus turnos.');
   };
 
