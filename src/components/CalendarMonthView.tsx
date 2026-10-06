@@ -3,7 +3,7 @@ import { Plus, Clock, Moon, Sparkles, Building2, Paintbrush, AlertTriangle, Chec
 import {
   CalendarDayItem, SPANISH_WEEKDAYS, getShiftDisplayCode, getShiftMobileLabel,
   isShiftLibre, isShiftCollision, formatFriendlyDate, doShiftsOverlap, getContrastTextColor,
-  getDynamicShiftTextClass, getDynamicHospitalTextClass
+  getDynamicShiftTextClass, getDynamicHospitalTextClass, getAutoFitFontSize
 } from '../lib/timeUtils';
 import { MedicalShift, Hospital, ShiftTemplate, ShiftCode } from '../types';
 import { getHospitalForShift, getShiftColor } from '../lib/storage';
@@ -276,21 +276,31 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
             <div className="flex items-center gap-2.5 min-w-0">
               {/* Tarjeta de previsualización 2 filas con color completo */}
               <div
-                className="px-2.5 py-1.5 rounded-xl border border-black/20 flex flex-col justify-center gap-0.5 shadow-sm overflow-hidden shrink-0 min-w-[85px]"
+                className="px-2.5 py-1.5 rounded-xl border border-black/20 flex flex-col justify-center items-center text-center gap-0.5 shadow-sm overflow-hidden shrink-0 min-w-[85px]"
                 style={{
                   backgroundColor: activeShiftColor,
                   color: getContrastTextColor(activeShiftColor),
                 }}
               >
-                {/* Fila 1: Turno */}
-                <div className="flex items-center justify-start leading-none min-w-0">
-                  <span className={`${getDynamicShiftTextClass(activeTpl?.name || selectedTemplateCode)} font-mono truncate leading-none drop-shadow-sm`}>
+                {/* Fila 1: Turno Centrado */}
+                <div className="w-full flex items-center justify-center text-center leading-none overflow-hidden">
+                  <span
+                    className="font-black font-mono tracking-tight text-center truncate block leading-none drop-shadow-sm"
+                    style={{
+                      fontSize: `${getAutoFitFontSize(activeTpl?.name || selectedTemplateCode, 15.5, 9, 65)}px`,
+                    }}
+                  >
                     {activeTpl?.name || selectedTemplateCode}
                   </span>
                 </div>
-                {/* Fila 2: Centro */}
-                <div className="min-w-0 leading-tight">
-                  <span className={`${getDynamicHospitalTextClass(activeHosp?.shortName || 'Centro')} opacity-90 truncate block drop-shadow-sm`}>
+                {/* Fila 2: Centro Centrado */}
+                <div className="w-full flex items-center justify-center text-center leading-tight overflow-hidden">
+                  <span
+                    className="font-extrabold tracking-tight opacity-90 text-center truncate block leading-tight drop-shadow-sm"
+                    style={{
+                      fontSize: `${getAutoFitFontSize(activeHosp?.shortName || 'Centro', 13.5, 8.5, 65)}px`,
+                    }}
+                  >
                     {activeHosp?.shortName || 'Centro'}
                   </span>
                 </div>
@@ -454,12 +464,13 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     const shiftDisplayName = isCollisionShift
                       ? '⚠️ Choque'
                       : (shiftTemplate?.name || getShiftDisplayCode(shift.shiftCode, templates) || shift.title || shift.shiftCode || 'TA');
-                    const hospShortName = hosp?.shortName || hosp?.name || 'Centro';
+                    const shiftFontSize = getAutoFitFontSize(shiftDisplayName, 15.5, 8.5, 42);
+                    const hospFontSize = getAutoFitFontSize(hospShortName, 13.5, 8, 42);
 
                     return (
                       <div
                         key={shift.id || idx}
-                        className={`rounded-lg py-1 px-1.5 shadow-sm flex flex-col justify-center gap-0.5 transition-all hover:scale-[1.02] relative overflow-hidden border border-black/20 ${
+                        className={`rounded-lg py-0.5 px-1 sm:py-1 sm:px-1 shadow-sm flex flex-col justify-center items-center text-center gap-0.5 transition-all hover:scale-[1.02] relative overflow-hidden border border-black/20 ${
                           isCollisionShift
                             ? 'ring-1 ring-red-400/80'
                             : ''
@@ -470,16 +481,26 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                         }}
                         title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${isLibreShift ? '0h (Libre)' : `${shift.hours}h`}${shift.department ? ` · Área: ${shift.department}` : ''}${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                       >
-                        {/* Fila 1 (Arriba): Nombre del Turno con tamaño dinámico */}
-                        <div className="flex items-center justify-start leading-none min-w-0">
-                          <span className={`${getDynamicShiftTextClass(isCollisionShift ? '⚠️ Choque' : shiftDisplayName)} font-mono truncate leading-none drop-shadow-sm`}>
-                            {isCollisionShift ? '⚠️ Choque' : shiftDisplayName}
+                        {/* Fila 1 (Arriba): Nombre del Turno Centrado y Auto-ajustado */}
+                        <div className="w-full flex items-center justify-center text-center leading-none overflow-hidden">
+                          <span
+                            className="font-black font-mono tracking-tight text-center truncate block leading-none drop-shadow-sm"
+                            style={{
+                              fontSize: `${shiftFontSize}px`,
+                            }}
+                          >
+                            {shiftDisplayName}
                           </span>
                         </div>
 
-                        {/* Fila 2 (Abajo): Nombre abreviado del centro con tamaño dinámico */}
-                        <div className="min-w-0 leading-tight w-full">
-                          <span className={`${getDynamicHospitalTextClass(hospShortName)} opacity-90 truncate block drop-shadow-sm`}>
+                        {/* Fila 2 (Abajo): Nombre abreviado del centro Centrado y Auto-ajustado */}
+                        <div className="w-full flex items-center justify-center text-center leading-tight overflow-hidden">
+                          <span
+                            className="font-extrabold tracking-tight opacity-90 text-center truncate block leading-tight drop-shadow-sm"
+                            style={{
+                              fontSize: `${hospFontSize}px`,
+                            }}
+                          >
                             {hospShortName}
                           </span>
                         </div>

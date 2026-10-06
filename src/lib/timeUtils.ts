@@ -379,25 +379,32 @@ export function getDynamicShiftTextClass(text: string): string {
 }
 
 /**
- * Returns dynamic Tailwind font classes for workplace/hospital names based on character length.
- * Shorter names (<= 4 chars like 'Bend', 'Cata', 'IHSS') get larger text (12-13px).
- * Longer names get smoothly reduced font size so the whole name remains readable.
+ * Calculates a precise automatic font size in pixels for text to fit within a target container width.
+ * Analyzes character glyph weights (narrow letters like 'i', 'l', '1' vs wide like 'M', 'W', 'Ñ').
+ * Ensures short text (e.g. 'TA', 'IHSS', '24H') expands up to maxPx,
+ * and longer text (e.g. 'Bendaña', 'Catarino') smoothly scales down so it never gets clipped.
  */
-export function getDynamicHospitalTextClass(text: string): string {
-  const len = (text || '').trim().length;
-  if (len <= 4) {
-    // e.g. Bend, Cata, IHSS, Util, Hosp, H1
-    return 'text-[12px] sm:text-[13px] font-black tracking-tight leading-none';
+export function getAutoFitFontSize(text: string, maxPx = 15, minPx = 7.5, targetWidth = 38): number {
+  if (!text) return maxPx;
+  const clean = text.trim();
+  if (clean.length === 0) return maxPx;
+
+  let totalUnits = 0;
+  for (let i = 0; i < clean.length; i++) {
+    const char = clean[i];
+    if ('ijlI1!:;.,|/\''.includes(char)) {
+      totalUnits += 0.28;
+    } else if ('mwMWÑñ%@&'.includes(char)) {
+      totalUnits += 0.74;
+    } else if ('tfjkr- ()'.includes(char)) {
+      totalUnits += 0.38;
+    } else {
+      totalUnits += 0.52;
+    }
   }
-  if (len <= 6) {
-    // e.g. CEMESA, San Ra, Hosp 1
-    return 'text-[11px] sm:text-[12px] font-extrabold tracking-tight leading-none';
-  }
-  if (len <= 9) {
-    // e.g. Bendaña, Catarino, Clinica
-    return 'text-[9.5px] sm:text-[10.5px] font-bold tracking-tight leading-tight';
-  }
-  // > 9 chars (e.g. Leonardo Martinez, Hospital Regional)
-  return 'text-[8.5px] sm:text-[9.5px] font-semibold tracking-tighter leading-none';
+
+  // Calculate proportional font size in pixels
+  const calculated = Math.floor((targetWidth / Math.max(totalUnits, 1)) * 10) / 10;
+  return Math.min(maxPx, Math.max(minPx, calculated));
 }
 
