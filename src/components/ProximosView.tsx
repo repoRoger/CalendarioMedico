@@ -85,7 +85,7 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
           color: textColor,
         }}
       >
-        {getShiftDisplayCode(shift.shiftCode)}
+        {getShiftDisplayCode(shift.shiftCode, templates)}
       </span>
     );
   };

@@ -87,13 +87,13 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
     const newStartTime = targetTpl?.defaultStartTime || '07:00';
     const newEndTime = targetTpl?.defaultEndTime || '15:00';
     const newHours = targetTpl?.defaultHours || 8;
-    const normalizedTargetCode = getShiftDisplayCode(selectedTemplateCode);
+    const normalizedTargetCode = getShiftDisplayCode(selectedTemplateCode, templates);
 
     // 1. Check if exact same shift already exists on this day in same hospital
     // If it exists, this is a TOGGLE OFF (remove) action. We must NOT trigger collision with other shifts!
     const exactMatch = allDayShifts.find((s) => {
       const sHosp = getHospitalForShift(s, hospitals);
-      const sCode = getShiftDisplayCode(s.shiftCode);
+      const sCode = getShiftDisplayCode(s.shiftCode, templates);
       return sHosp.id === targetHosp.id && sCode === normalizedTargetCode;
     });
 
@@ -270,26 +270,26 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
             </div>
           </div>
 
-          {/* Banner de Previsualización: 2 Filas (Arriba Turno, Abajo Centro) + Barra Lateral */}
+          {/* Banner de Previsualización: 2 Filas (Arriba Turno, Abajo Centro) */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs">
             <div className="flex items-center gap-2.5 min-w-0">
-              {/* Tarjeta de previsualización 2 filas */}
-              <div className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-center gap-0.5 shadow-sm overflow-hidden shrink-0 min-w-[85px]">
+              {/* Tarjeta de previsualización 2 filas con color completo */}
+              <div
+                className="px-2.5 py-1.5 rounded-xl border border-black/20 flex flex-col justify-center gap-0.5 shadow-sm overflow-hidden shrink-0 min-w-[85px]"
+                style={{
+                  backgroundColor: activeShiftColor,
+                  color: getContrastTextColor(activeShiftColor),
+                }}
+              >
                 {/* Fila 1: Turno */}
-                <div className="flex items-center justify-start leading-none">
-                  <span
-                    className="px-2 py-0.5 rounded text-[10.5px] font-black font-mono shadow-sm border border-white/20"
-                    style={{
-                      backgroundColor: activeShiftColor,
-                      color: getContrastTextColor(activeShiftColor),
-                    }}
-                  >
-                    {selectedTemplateCode}
+                <div className="flex items-center justify-start leading-none min-w-0">
+                  <span className="font-black text-[10.5px] font-mono tracking-tight truncate leading-none drop-shadow-sm">
+                    {activeTpl?.name || selectedTemplateCode}
                   </span>
                 </div>
                 {/* Fila 2: Centro */}
                 <div className="min-w-0 leading-tight">
-                  <span className="font-extrabold text-[11px] text-white tracking-tight truncate block drop-shadow-sm">
+                  <span className="font-extrabold text-[10px] opacity-90 tracking-tight truncate block drop-shadow-sm">
                     {activeHosp?.shortName || 'Centro'}
                   </span>
                 </div>
@@ -441,14 +441,14 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                   <span className="text-[9px] text-emerald-400/80 font-medium">Descanso</span>
                 </div>
               ) : (
-                <div className="flex-1 space-y-1.5 overflow-hidden">
+                <div className="flex-1 space-y-1 sm:space-y-1.5 overflow-hidden">
                   {dayShifts.slice(0, 3).map((shift, idx) => {
                     const hosp = getHospitalForShift(shift, hospitals);
-                    const workplaceColor = hosp?.color || hosp?.gradientStart || '#0d9488';
                     const shiftColor = getShiftColor(shift.shiftCode, templates);
                     const shiftTextColor = getContrastTextColor(shiftColor);
 
-                    const displayCode = getShiftDisplayCode(shift.shiftCode);
+                    const shiftTemplate = templates.find((t) => t.code === shift.shiftCode);
+                    const shiftDisplayName = shiftTemplate?.name || shift.title || getShiftDisplayCode(shift.shiftCode, templates);
                     const hospShortName = hosp?.shortName || hosp?.name || 'Centro';
                     const isLibreShift = isShiftLibre(shift.shiftCode);
                     const isCollisionShift = isShiftCollision(shift.shiftCode) || shift.isCollision;
@@ -456,36 +456,27 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     return (
                       <div
                         key={shift.id || idx}
-                        className={`rounded-lg py-1 px-1.5 shadow-md flex flex-col justify-center gap-0.5 transition-all hover:scale-[1.02] relative overflow-hidden bg-slate-900 border ${
+                        className={`rounded-lg py-1 px-1.5 shadow-sm flex flex-col justify-center gap-0.5 transition-all hover:scale-[1.02] relative overflow-hidden border border-black/20 ${
                           isCollisionShift
-                            ? 'border-red-500/80 ring-1 ring-red-500/60 bg-red-950/40'
-                            : isLibreShift
-                            ? 'border-emerald-500/40 bg-slate-900/90'
-                            : 'border-slate-800 hover:border-slate-700'
+                            ? 'ring-1 ring-red-400/80'
+                            : ''
                         }`}
+                        style={{
+                          backgroundColor: isCollisionShift ? '#dc2626' : shiftColor,
+                          color: isCollisionShift ? '#ffffff' : shiftTextColor,
+                        }}
                         title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${isLibreShift ? '0h (Libre)' : `${shift.hours}h`}${shift.department ? ` · Área: ${shift.department}` : ''}${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                       >
-
-                        {/* Fila 1 (Arriba): Nombre y Color del Turno */}
-                        <div className="flex items-center justify-start leading-none">
-                          <span
-                            className="px-1.5 py-0.5 rounded text-[9.5px] sm:text-[10px] font-black font-mono shadow-sm shrink-0 border border-white/20 leading-none flex items-center gap-0.5"
-                            style={{
-                              backgroundColor: isCollisionShift
-                                ? '#dc2626'
-                                : isLibreShift
-                                ? '#059669'
-                                : shiftColor,
-                              color: isCollisionShift || isLibreShift ? '#ffffff' : shiftTextColor,
-                            }}
-                          >
-                            {isCollisionShift ? '⚠️ Choque' : displayCode}
+                        {/* Fila 1 (Arriba): Nombre del Turno */}
+                        <div className="flex items-center justify-start leading-none min-w-0">
+                          <span className="font-black text-[10px] sm:text-[11px] font-mono tracking-tight truncate leading-none drop-shadow-sm">
+                            {isCollisionShift ? '⚠️ Choque' : shiftDisplayName}
                           </span>
                         </div>
 
-                        {/* Fila 2 (Abajo): Nombre abreviado del centro (sin emoji ni color extra, sobre fondo oscuro) */}
+                        {/* Fila 2 (Abajo): Nombre abreviado del centro */}
                         <div className="min-w-0 leading-tight w-full">
-                          <span className="font-extrabold text-[10.5px] sm:text-[11.5px] text-white tracking-tight truncate block drop-shadow-sm">
+                          <span className="font-extrabold text-[9.5px] sm:text-[10.5px] opacity-90 truncate block drop-shadow-sm">
                             {hospShortName}
                           </span>
                         </div>

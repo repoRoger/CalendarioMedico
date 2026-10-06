@@ -470,7 +470,7 @@ export const DayEditModal: React.FC<DayEditModalProps> = ({
                                     color: isCollision || isWholeDayOff || isCenterLibre ? '#ffffff' : shiftTextColor,
                                   }}
                                 >
-                                  {getShiftDisplayCode(shift.shiftCode)}: {getShiftDisplayName(shift.title || shift.shiftCode)}
+                                  {isCollision ? '⚠️ Choque' : (templates.find((t) => t.code === shift.shiftCode)?.name || shift.title || getShiftDisplayCode(shift.shiftCode, templates))}
                                 </span>
 
                                 {!isWholeDayOff && !isCenterLibre && (

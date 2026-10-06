@@ -1025,6 +1025,7 @@ export default function App() {
               <ShiftListView
                 shifts={hospitalFilter === 'all' ? shifts : shifts.filter((s) => s.hospitalId === hospitalFilter)}
                 hospitals={hospitals}
+                templates={templates}
                 onSelectDate={(date) => setSelectedDateForModal(date)}
               />
             )}

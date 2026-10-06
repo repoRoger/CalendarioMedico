@@ -3,21 +3,24 @@ import {
   Clock, Building2, Calendar, Filter, Plus, Moon,
   FileText, UserCheck, ChevronRight
 } from 'lucide-react';
-import { MedicalShift, Hospital } from '../types';
+import { MedicalShift, Hospital, ShiftTemplate } from '../types';
 import {
-  formatFriendlyDate, getHondurasTodayIso, getHondurasTomorrowIso
+  formatFriendlyDate, getHondurasTodayIso, getHondurasTomorrowIso,
+  getShiftDisplayCode, getContrastTextColor, isShiftCollision
 } from '../lib/timeUtils';
-import { getHospitalForShift } from '../lib/storage';
+import { getHospitalForShift, getShiftColor } from '../lib/storage';
 
 interface ShiftListViewProps {
   shifts: MedicalShift[];
   hospitals: Hospital[];
+  templates?: ShiftTemplate[];
   onSelectDate: (date: string) => void;
 }
 
 export const ShiftListView: React.FC<ShiftListViewProps> = ({
   shifts,
   hospitals,
+  templates = [],
   onSelectDate,
 }) => {
   const [filterHospital, setFilterHospital] = useState<string>('all');
@@ -51,22 +54,19 @@ export const ShiftListView: React.FC<ShiftListViewProps> = ({
   });
 
   const renderBadge = (shift: MedicalShift) => {
-    switch (shift.shiftCode) {
-      case '24H':
-        return <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-lg text-xs font-bold">Guardia 24H</span>;
-      case 'TC':
-      case 'N':
-        return <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1"><Moon className="w-3 h-3" /> TC</span>;
-      case 'TB':
-      case 'T':
-        return <span className="bg-orange-500/20 text-orange-300 border border-orange-500/30 px-2 py-0.5 rounded-lg text-xs font-bold">TB</span>;
-      case 'C':
-        return <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1"><UserCheck className="w-3 h-3" /> Cubrir</span>;
-      case 'TA':
-      case 'M':
-      default:
-        return <span className="bg-teal-500/20 text-teal-300 border border-teal-500/30 px-2 py-0.5 rounded-lg text-xs font-bold">TA</span>;
-    }
+    const isCol = isShiftCollision(shift.shiftCode) || shift.isCollision;
+    const color = isCol ? '#dc2626' : getShiftColor(shift.shiftCode, templates);
+    const textColor = isCol ? '#ffffff' : getContrastTextColor(color);
+    const displayName = isCol ? '⚠️ Choque' : getShiftDisplayCode(shift.shiftCode, templates);
+
+    return (
+      <span
+        className="px-2.5 py-1 rounded-lg text-xs font-black font-mono shadow-sm border border-white/20 inline-flex items-center gap-1"
+        style={{ backgroundColor: color, color: textColor }}
+      >
+        {displayName}
+      </span>
+    );
   };
 
   return (

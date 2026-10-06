@@ -204,7 +204,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                               color: isCollisionShift || isLibre ? '#ffffff' : shiftTextColor,
                             }}
                           >
-                            {isCollisionShift ? '⚠️ CHOQUE' : getShiftDisplayCode(shift.shiftCode)}
+                            {isCollisionShift ? '⚠️ CHOQUE' : getShiftDisplayCode(shift.shiftCode, templates)}
                           </span>
                           <span className="font-bold text-[11px] text-teal-300 font-mono">
                             {isLibre ? '0h' : `${shift.hours}h`}

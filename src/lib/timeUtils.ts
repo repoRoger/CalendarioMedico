@@ -1,3 +1,5 @@
+import { ShiftTemplate } from '../types';
+
 export const SPANISH_MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
@@ -187,7 +189,11 @@ export function getWeekDays(currentDate: Date): CalendarDayItem[] {
  * Tarde -> TB
  * Noche -> TC
  */
-export function getShiftDisplayCode(code: string): string {
+export function getShiftDisplayCode(code: string, templates?: ShiftTemplate[]): string {
+  if (templates && templates.length > 0) {
+    const found = templates.find((t) => t.code === code);
+    if (found?.name) return found.name;
+  }
   switch (code) {
     case 'M':
     case 'TA':
