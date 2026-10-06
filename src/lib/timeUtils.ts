@@ -384,9 +384,9 @@ export function getDynamicShiftTextClass(text: string): string {
  * Ensures short text (e.g. 'TA', 'IHSS', '24H') expands up to maxPx,
  * and longer text (e.g. 'Bendaña', 'Catarino') smoothly scales down so it never gets clipped.
  */
-export function getAutoFitFontSize(text: string, maxPx = 15, minPx = 7.5, targetWidth = 38): number {
-  if (!text) return maxPx;
-  const clean = text.trim();
+export function getAutoFitFontSize(text: any, maxPx = 15, minPx = 7.5, targetWidth = 38): number {
+  if (text === null || text === undefined) return maxPx;
+  const clean = String(text).trim();
   if (clean.length === 0) return maxPx;
 
   let totalUnits = 0;

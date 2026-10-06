@@ -464,6 +464,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     const shiftDisplayName = isCollisionShift
                       ? '⚠️ Choque'
                       : (shiftTemplate?.name || getShiftDisplayCode(shift.shiftCode, templates) || shift.title || shift.shiftCode || 'TA');
+                    const hospShortName = hosp?.shortName || hosp?.name || 'Centro';
                     const shiftFontSize = getAutoFitFontSize(shiftDisplayName, 15.5, 8.5, 42);
                     const hospFontSize = getAutoFitFontSize(hospShortName, 13.5, 8, 42);
 
