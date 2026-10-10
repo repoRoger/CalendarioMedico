@@ -3,6 +3,7 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.calendariomedico.app"
     compileSdk = rootProject.ext.compileSdkVersion
+
     defaultConfig {
         applicationId "com.calendariomedico.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -15,6 +16,8 @@ android {
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
+    }
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -23,6 +26,7 @@ android {
             keyPassword 'android'
         }
     }
+
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
