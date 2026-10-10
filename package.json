@@ -16,6 +16,7 @@
     "@capacitor/cli": "^8.5.3",
     "@capacitor/core": "^8.5.3",
     "@capacitor/local-notifications": "^8.3.1",
+    "@capawesome/capacitor-google-sign-in": "^0.1.4",
     "@google/genai": "^2.4.0",
     "@libsql/client": "^0.18.0",
     "@react-oauth/google": "^0.13.5",
