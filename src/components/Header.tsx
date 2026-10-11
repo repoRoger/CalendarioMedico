@@ -67,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Name & Cargo (Clean, compact and truncated to prevent overflowing buttons) */}
           <div className="min-w-0 max-w-[135px] sm:max-w-xs">
-            <h1 className="text-sm font-black tracking-tight text-white group-hover:text-teal-300 transition-colors truncate">
+            <h1 className="text-sm font-black tracking-tight text-yellow-400 group-hover:text-amber-300 transition-colors truncate">
               {getCleanShortName()}
             </h1>
             <p className="text-[11px] text-slate-400 truncate">
