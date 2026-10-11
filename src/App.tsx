@@ -96,13 +96,14 @@ export default function App() {
   const [notifications, setNotifications] = useState<LedMessage[]>([]);
 
   const addNotification = (type: 'success' | 'warning' | 'info', title: string, detail?: string) => {
-    const id = `notif-${Date.now()}-${Math.random()}`;
+    const id = `notif-${Date.now()}`;
     const newMsg: LedMessage = { id, type, title, detail };
-    setNotifications((prev) => [...prev, newMsg]);
+    // Only 1 message at a time to prevent obstructing the screen
+    setNotifications([newMsg]);
 
     setTimeout(() => {
       setNotifications((prev) => prev.filter((n) => n.id !== id));
-    }, 4500);
+    }, 2500);
   };
 
   const dismissNotification = (id: string) => {
@@ -559,43 +560,62 @@ export default function App() {
   // Handlers for data updates: DIRECT TURSO ONLY (No localStorage)
   const handleSaveDayShifts = async (date: string, updatedDayShifts: MedicalShift[]) => {
     const existingDayShifts = shifts.filter((s) => s.date === date);
-    const filtered = shifts.filter((s) => s.date !== date);
-    const nextShifts = [...filtered, ...updatedDayShifts];
-    setShifts(nextShifts);
+    const removedShifts = existingDayShifts.filter(
+      (oldS) => !updatedDayShifts.some((newS) => newS.id === oldS.id)
+    );
+    const addedShifts = updatedDayShifts.filter(
+      (newS) => !existingDayShifts.some((oldS) => oldS.id === newS.id)
+    );
 
-    const totalHours = updatedDayShifts.reduce((acc, s) => acc + (s.hours || 0), 0);
-    if (totalHours >= 24) {
-      addNotification(
-        'warning',
-        '⚡ Guardia de 24 horas registrada',
-        `Has programado ${totalHours}h continuas para el ${date}. Recuerda descansar después.`
-      );
-    } else if (updatedDayShifts.length > 0) {
-      addNotification(
-        'success',
-        'Turnos guardados',
-        `${updatedDayShifts.length} turno(s) guardado(s) (${totalHours}h totales).`
-      );
-    } else {
-      addNotification('info', 'Día actualizado', 'Se eliminaron los turnos asignados a esta fecha.');
-    }
+    const formatShortDate = (d: string) => {
+      try {
+        const parts = d.split('-');
+        if (parts.length === 3) {
+          const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+          return `${parseInt(parts[2], 10)}-${months[parseInt(parts[1], 10) - 1] || parts[1]}-${parts[0]}`;
+        }
+      } catch {}
+      return d;
+    };
 
-    // Direct mutation to Turso database
+    // Confirm mutation directly with Turso before displaying
     if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
       try {
         const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-        const removedShifts = existingDayShifts.filter(
-          (oldS) => !updatedDayShifts.some((newS) => newS.id === oldS.id)
-        );
         for (const rem of removedShifts) {
           await deleteShiftFromTurso(client, user.email, rem.id);
         }
         for (const s of updatedDayShifts) {
           await saveShiftToTurso(client, user.email, s);
         }
-      } catch (err) {
-        console.warn('Error saving shifts directly to Turso:', err);
-        addNotification('warning', 'Aviso Turso', 'Error al sincronizar turnos con Turso.');
+
+        // CONFIRMED in Turso: Now update local view
+        const filtered = shifts.filter((s) => s.date !== date);
+        setShifts([...filtered, ...updatedDayShifts]);
+
+        // Subtle, elegant feedback
+        if (removedShifts.length > 0 && updatedDayShifts.length === 0) {
+          const code = removedShifts[0].title || removedShifts[0].shiftCode;
+          addNotification('info', `Se ha eliminado ${code}`);
+        } else if (addedShifts.length > 0) {
+          const code = addedShifts[0].title || addedShifts[0].shiftCode;
+          addNotification('success', `Se creó ${code} el ${formatShortDate(date)}`);
+        } else if (updatedDayShifts.length > 0) {
+          const code = updatedDayShifts[0].title || updatedDayShifts[0].shiftCode;
+          addNotification('success', `Se actualizó ${code}`);
+        }
+      } catch (err: any) {
+        console.error('Error saving shifts directly to Turso:', err);
+        addNotification('warning', 'Error al conectar con Turso');
+      }
+    } else {
+      const filtered = shifts.filter((s) => s.date !== date);
+      setShifts([...filtered, ...updatedDayShifts]);
+
+      if (removedShifts.length > 0 && updatedDayShifts.length === 0) {
+        addNotification('info', `Se ha eliminado ${removedShifts[0].title || removedShifts[0].shiftCode}`);
+      } else if (addedShifts.length > 0) {
+        addNotification('success', `Se creó ${addedShifts[0].title || addedShifts[0].shiftCode} el ${formatShortDate(date)}`);
       }
     }
   };
@@ -768,7 +788,17 @@ export default function App() {
         onOpenProfile={() => setIsProfileModalOpen(true)}
         onOpenStats={() => setIsStatsModalOpen(true)}
         onOpenExport={() => setIsExportModalOpen(true)}
+        onRefresh={() => handleSyncCloud(false)}
+        isRefreshing={isSyncingCloud}
       />
+
+      {/* Top subtle loading indicator */}
+      {isSyncingCloud && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-900/95 border border-teal-500/40 text-teal-300 text-xs font-semibold backdrop-blur shadow-xl">
+          <RefreshCw className="w-3 h-3 animate-spin text-teal-400" />
+          <span>Cargando datos...</span>
+        </div>
+      )}
 
       {/* Main Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 pb-24">

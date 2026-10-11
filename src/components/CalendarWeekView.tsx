@@ -8,6 +8,7 @@ import {
 } from '../lib/timeUtils';
 import { MedicalShift, Hospital, ShiftTemplate } from '../types';
 import { getHospitalForShift, getShiftColor } from '../lib/storage';
+import { getShiftGradient } from '../lib/colorUtils';
 
 interface CalendarWeekViewProps {
   days: CalendarDayItem[];
@@ -200,8 +201,13 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                           <span
                             className="px-2 py-0.5 rounded-md font-mono font-black text-[10.5px] shadow-sm border border-white/20"
                             style={{
-                              backgroundColor: isCollisionShift ? '#dc2626' : isLibre ? '#059669' : shiftColor,
-                              color: isCollisionShift || isLibre ? '#ffffff' : shiftTextColor,
+                              background: isCollisionShift
+                                ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)'
+                                : isLibre
+                                ? 'linear-gradient(135deg, #10b981 0%, #047857 100%)'
+                                : getShiftGradient(shiftColor).background,
+                              borderColor: isCollisionShift ? 'rgba(239, 68, 68, 0.4)' : getShiftGradient(shiftColor).borderColor,
+                              color: isCollisionShift || isLibre ? '#ffffff' : getShiftGradient(shiftColor).textColor,
                             }}
                           >
                             {isCollisionShift ? '⚠️ CHOQUE' : getShiftDisplayCode(shift.shiftCode, templates)}

@@ -7,6 +7,7 @@ import {
 } from '../lib/timeUtils';
 import { MedicalShift, Hospital, ShiftTemplate, ShiftCode } from '../types';
 import { getHospitalForShift, getShiftColor } from '../lib/storage';
+import { getShiftGradient } from '../lib/colorUtils';
 
 interface CalendarMonthViewProps {
   days: CalendarDayItem[];
@@ -315,7 +316,8 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
               {templates.map((tpl) => {
                 const isSel = selectedTemplateCode === tpl.code;
                 const shiftColor = getShiftColor(tpl.code, templates);
-                const textColor = getContrastTextColor(shiftColor);
+                const shiftGrad = getShiftGradient(shiftColor);
+                const textColor = shiftGrad.textColor;
                 return (
                   <button
                     key={tpl.id}
@@ -327,7 +329,8 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                         : 'text-slate-300 bg-slate-900 border-slate-800 hover:text-white'
                     }`}
                     style={{
-                      backgroundColor: isSel ? shiftColor : undefined,
+                      background: isSel ? shiftGrad.background : undefined,
+                      borderColor: isSel ? shiftGrad.borderColor : undefined,
                       color: isSel ? textColor : undefined,
                     }}
                   >
@@ -367,12 +370,13 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
           {/* Banner de Previsualización: 2 Filas (Arriba Turno, Abajo Centro) */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs">
             <div className="flex items-center gap-2.5 min-w-0">
-              {/* Tarjeta de previsualización 2 filas con color completo */}
+              {/* Tarjeta de previsualización 2 filas con degradado armónico */}
               <div
-                className="px-2.5 py-1.5 rounded-xl border border-black/20 flex flex-col justify-center items-center text-center gap-0.5 shadow-sm overflow-hidden shrink-0 min-w-[85px]"
+                className="px-2.5 py-1.5 rounded-xl border flex flex-col justify-center items-center text-center gap-0.5 shadow-md overflow-hidden shrink-0 min-w-[85px]"
                 style={{
-                  backgroundColor: activeShiftColor,
-                  color: getContrastTextColor(activeShiftColor),
+                  background: getShiftGradient(activeShiftColor).background,
+                  borderColor: getShiftGradient(activeShiftColor).borderColor,
+                  color: getShiftGradient(activeShiftColor).textColor,
                 }}
               >
                 {/* Fila 1: Turno Centrado */}
@@ -607,7 +611,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                   {dayShifts.slice(0, 3).map((shift, idx) => {
                     const hosp = getHospitalForShift(shift, hospitals);
                     const shiftColor = getShiftColor(shift.shiftCode, templates);
-                    const shiftTextColor = getContrastTextColor(shiftColor);
+                    const shiftGrad = getShiftGradient(shiftColor);
 
                     const shiftTemplate = templates.find((t) => t.code === shift.shiftCode);
                     const isLibreShift = isShiftLibre(shift.shiftCode);
@@ -622,14 +626,18 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     return (
                       <div
                         key={shift.id || idx}
-                        className={`rounded-lg py-0.5 px-0.5 sm:py-1 sm:px-1 shadow-sm flex flex-col justify-center items-center text-center gap-0.5 transition-all hover:scale-[1.02] relative overflow-hidden border border-black/20 ${
+                        className={`rounded-lg py-0.5 px-0.5 sm:py-1 sm:px-1 shadow-sm flex flex-col justify-center items-center text-center gap-0.5 transition-all hover:scale-[1.02] relative overflow-hidden border ${
                           isCollisionShift
-                            ? 'ring-1 ring-red-400/80'
+                            ? 'ring-1 ring-red-400/80 border-red-500/80'
                             : ''
                         }`}
                         style={{
-                          backgroundColor: isCollisionShift ? '#dc2626' : shiftColor,
-                          color: isCollisionShift ? '#ffffff' : shiftTextColor,
+                          background: isCollisionShift
+                            ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)'
+                            : shiftGrad.background,
+                          borderColor: isCollisionShift ? 'rgba(239, 68, 68, 0.4)' : shiftGrad.borderColor,
+                          color: isCollisionShift ? '#ffffff' : shiftGrad.textColor,
+                          boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.4)',
                         }}
                         title={`${shift.title} en ${hosp?.name || 'Centro'} (${shift.startTime} - ${shift.endTime}) · ${isLibreShift ? '0h (Libre)' : `${shift.hours}h`}${shift.department ? ` · Área: ${shift.department}` : ''}${shift.notes ? ` · 📝 ${shift.notes}` : ''}`}
                       >
