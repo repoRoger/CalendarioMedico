@@ -406,11 +406,10 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                 <div className="flex items-center gap-1">
                   {dayHasCollision ? (
                     <span
-                      className="px-1.5 py-0.5 rounded text-[10px] font-black font-mono text-red-100 bg-red-600 border border-red-400 shadow-sm animate-pulse flex items-center gap-0.5"
+                      className="p-0.5 rounded text-red-100 bg-red-600 border border-red-400 shadow-sm animate-pulse flex items-center justify-center shrink-0"
                       title="¡Conflicto de horario / Choque entre turnos!"
                     >
                       <AlertTriangle className="w-3 h-3" />
-                      CHOQUE
                     </span>
                   ) : is24H ? (
                     <span
@@ -462,7 +461,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     const isLibreShift = isShiftLibre(shift.shiftCode);
                     const isCollisionShift = isShiftCollision(shift.shiftCode) || shift.isCollision;
                     const shiftDisplayName = isCollisionShift
-                      ? '⚠️ Choque'
+                      ? '⚠️'
                       : (shiftTemplate?.name || getShiftDisplayCode(shift.shiftCode, templates) || shift.title || shift.shiftCode || 'TA');
                     const hospShortName = hosp?.shortName || hosp?.name || 'Centro';
                     const shiftFontSize = getAutoFitFontSize(shiftDisplayName, true);

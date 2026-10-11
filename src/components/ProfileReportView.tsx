@@ -188,40 +188,42 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
           </div>
         </div>
 
-        {/* Database & Cloud status */}
-        <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center shrink-0">
-              <Database className="w-4 h-4" />
+        {/* Oculto temporalmente: Carga de turnos de muestra para adaptar a multiples áreas de trabajo en el futuro */}
+        {false && (
+          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center shrink-0">
+                <Database className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-200">
+                  Base de Datos en la Nube (Turso LibSQL)
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  BD: <span className="font-mono text-teal-400">calendariomedico-rogerappfinanzas</span> ({user.email})
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold text-slate-200">
-                Base de Datos en la Nube (Turso LibSQL)
-              </p>
-              <p className="text-[11px] text-slate-400">
-                BD: <span className="font-mono text-teal-400">calendariomedico-rogerappfinanzas</span> ({user.email})
-              </p>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+              {onLoadSampleShifts && (
+                <button
+                  onClick={onLoadSampleShifts}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-all active:scale-95 min-h-[38px]"
+                  title="Cargar y combinar turnos de muestra de Octubre"
+                >
+                  <Plus className="w-3.5 h-3.5 text-teal-400" />
+                  <span>+ Turnos de Muestra</span>
+                </button>
+              )}
+
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-950/50 px-3 py-1.5 rounded-xl border border-emerald-800/40 min-h-[38px]">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Conectado</span>
+              </div>
             </div>
           </div>
-
-          <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
-            {onLoadSampleShifts && (
-              <button
-                onClick={onLoadSampleShifts}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-all active:scale-95 min-h-[38px]"
-                title="Cargar y combinar turnos de muestra de Octubre"
-              >
-                <Plus className="w-3.5 h-3.5 text-teal-400" />
-                <span>+ Turnos de Muestra</span>
-              </button>
-            )}
-
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-950/50 px-3 py-1.5 rounded-xl border border-emerald-800/40 min-h-[38px]">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Conectado</span>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Actualizaciones de la Aplicación */}
         <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">

@@ -15,13 +15,28 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenStats,
   onOpenExport,
 }) => {
+  // Obtener solo primeros dos nombres o nombre y apellido (sin cargo ni prefijo)
+  const getCleanShortName = () => {
+    const raw = (user.personalName || user.name || '')
+      .replace(/^(Licda\.|Lic\.|Dr\.|Dra\.|Téc\.|Enf\.|Aux\.|Ing\.|Prof\.|Sr\.|Sra\.)\s*/i, '')
+      .trim();
+    if (!raw) return 'Usuario';
+    const words = raw.split(/\s+/).filter(Boolean);
+    return words.slice(0, 2).join(' ');
+  };
+
+  // Solo el cargo abajo (sin especialidad ni lugar de trabajo)
+  const getShortCargo = () => {
+    return user.role?.trim() || user.titlePrefix?.trim() || 'Profesional';
+  };
+
   return (
     <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-6 py-2.5">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-        {/* Left: User Title & Name (e.g. Lic. Roger Adan) and Role */}
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-2.5 sm:gap-4">
+        {/* Left: User Avatar, Name & Cargo */}
         <button
           onClick={onOpenProfile}
-          className="flex items-center gap-2.5 text-left group hover:opacity-95 transition-opacity"
+          className="flex items-center gap-2 sm:gap-2.5 text-left group hover:opacity-95 transition-opacity min-w-0"
           title="Ver perfil y reportes"
         >
           {/* Avatar or Initials */}
@@ -45,19 +60,19 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* Name & Role (no email username) */}
-          <div className="min-w-0">
-            <h1 className="text-sm sm:text-base font-black tracking-tight text-white group-hover:text-teal-300 transition-colors truncate">
-              {user.name}
+          {/* Name & Cargo (Clean, compact and truncated to prevent overflowing buttons) */}
+          <div className="min-w-0 max-w-[135px] sm:max-w-xs">
+            <h1 className="text-sm font-black tracking-tight text-white group-hover:text-teal-300 transition-colors truncate">
+              {getCleanShortName()}
             </h1>
             <p className="text-[11px] text-slate-400 truncate">
-              {user.role ? `${user.role}${user.specialty ? ` · ${user.specialty}` : ''}` : (user.specialty || 'Personal de Salud')}
+              {getShortCargo()}
             </p>
           </div>
         </button>
 
-        {/* Right: Quick actions (Only Resumen and Compartir) */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Right: Quick actions (Resumen y Compartir) - shrink-0 to never overflow */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {onOpenStats && (
             <button
               onClick={onOpenStats}
