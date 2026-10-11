@@ -1,5 +1,5 @@
 import { createClient, Client } from '@libsql/client/web';
-import { MedicalShift, Hospital, ShiftTemplate, UserSession } from '../types';
+import { MedicalShift, Hospital, ShiftTemplate, UserSession, AppUpdateInfo } from '../types';
 
 export interface TursoSyncResult {
   success: boolean;
@@ -149,6 +149,18 @@ export async function initializeTursoTables(client: Client): Promise<void> {
   try {
     await client.execute(`ALTER TABLE usuarios ADD COLUMN creado_con_google INTEGER DEFAULT 0`);
   } catch {}
+
+  // Table: app_versiones (permite verificar y actualizar la APK directamente)
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS app_versiones (
+      id TEXT PRIMARY KEY,
+      version TEXT NOT NULL,
+      version_code INTEGER NOT NULL,
+      download_url TEXT NOT NULL,
+      notas TEXT,
+      actualizado_en TEXT
+    )
+  `);
 }
 
 /**
@@ -807,5 +819,273 @@ export async function loginUserWithPassword(
     };
   }
 }
+
+/**
+ * Direct CRUD: Saves or updates a single shift directly in Turso.
+ */
+export async function saveShiftToTurso(
+  client: Client,
+  clienteCorreo: string,
+  shift: MedicalShift
+): Promise<boolean> {
+  try {
+    const email = clienteCorreo.trim().toLowerCase();
+    await client.execute({
+      sql: `
+        INSERT INTO turnos (id, cliente_correo, fecha, hospital_id, codigo_turno, titulo, hora_inicio, hora_fin, horas, departamento, notas, es_nocturno, es_sustituto, creado_en)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          fecha = excluded.fecha,
+          hospital_id = excluded.hospital_id,
+          codigo_turno = excluded.codigo_turno,
+          titulo = excluded.titulo,
+          hora_inicio = excluded.hora_inicio,
+          hora_fin = excluded.hora_fin,
+          horas = excluded.horas,
+          departamento = excluded.departamento,
+          notas = excluded.notas,
+          es_nocturno = excluded.es_nocturno,
+          es_sustituto = excluded.es_sustituto
+      `,
+      args: [
+        shift.id,
+        email,
+        shift.date,
+        shift.hospitalId,
+        shift.shiftCode,
+        shift.title,
+        shift.startTime,
+        shift.endTime,
+        shift.hours,
+        shift.department || null,
+        shift.notes || null,
+        shift.isNightShift ? 1 : 0,
+        shift.isSubstitute ? 1 : 0,
+        new Date().toISOString(),
+      ],
+    });
+    return true;
+  } catch (err) {
+    console.error('Error saving shift to Turso:', err);
+    return false;
+  }
+}
+
+/**
+ * Direct CRUD: Deletes a single shift directly from Turso.
+ */
+export async function deleteShiftFromTurso(
+  client: Client,
+  clienteCorreo: string,
+  shiftId: string
+): Promise<boolean> {
+  try {
+    const email = clienteCorreo.trim().toLowerCase();
+    await client.execute({
+      sql: `DELETE FROM turnos WHERE cliente_correo = ? AND id = ?`,
+      args: [email, shiftId],
+    });
+    return true;
+  } catch (err) {
+    console.error('Error deleting shift from Turso:', err);
+    return false;
+  }
+}
+
+/**
+ * Direct CRUD: Saves or updates a workplace/hospital directly in Turso.
+ */
+export async function saveHospitalToTurso(
+  client: Client,
+  clienteCorreo: string,
+  hospital: Hospital
+): Promise<boolean> {
+  try {
+    const email = clienteCorreo.trim().toLowerCase();
+    const hospId = hospital.id.startsWith(`${email}__`) ? hospital.id : `${email}__${hospital.id}`;
+    await client.execute({
+      sql: `
+        INSERT INTO hospitales (id, cliente_correo, nombre, nombre_corto, tipo_negocio, ciudad, color, gradiente_inicio, gradiente_fin, icono_badge, logo_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          nombre = excluded.nombre,
+          nombre_corto = excluded.nombre_corto,
+          tipo_negocio = excluded.tipo_negocio,
+          ciudad = excluded.ciudad,
+          color = excluded.color,
+          gradiente_inicio = excluded.gradiente_inicio,
+          gradiente_fin = excluded.gradiente_fin,
+          icono_badge = excluded.icono_badge,
+          logo_url = excluded.logo_url
+      `,
+      args: [
+        hospId,
+        email,
+        hospital.name,
+        hospital.shortName,
+        hospital.businessType || null,
+        hospital.city,
+        hospital.color,
+        hospital.gradientStart || '#0d9488',
+        hospital.gradientEnd || '#059669',
+        hospital.badgeIcon,
+        hospital.logoUrl || null,
+      ],
+    });
+    return true;
+  } catch (err) {
+    console.error('Error saving hospital to Turso:', err);
+    return false;
+  }
+}
+
+/**
+ * Direct CRUD: Saves or updates a shift template directly in Turso.
+ */
+export async function saveTemplateToTurso(
+  client: Client,
+  clienteCorreo: string,
+  template: ShiftTemplate
+): Promise<boolean> {
+  try {
+    const email = clienteCorreo.trim().toLowerCase();
+    const tplId = template.id.startsWith(`${email}__`) ? template.id : `${email}__${template.id}`;
+    await client.execute({
+      sql: `
+        INSERT INTO plantillas_turnos (id, cliente_correo, codigo, nombre, inicio_defecto, fin_defecto, horas_defecto, color, color_badge, descripcion, es_nocturno)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          codigo = excluded.codigo,
+          nombre = excluded.nombre,
+          inicio_defecto = excluded.inicio_defecto,
+          fin_defecto = excluded.fin_defecto,
+          horas_defecto = excluded.horas_defecto,
+          color = excluded.color,
+          color_badge = excluded.color_badge,
+          descripcion = excluded.descripcion,
+          es_nocturno = excluded.es_nocturno
+      `,
+      args: [
+        tplId,
+        email,
+        template.code,
+        template.name,
+        template.defaultStartTime,
+        template.defaultEndTime,
+        template.defaultHours,
+        template.color || null,
+        template.colorBadge || null,
+        template.description || null,
+        template.isNightShift ? 1 : 0,
+      ],
+    });
+    return true;
+  } catch (err) {
+    console.error('Error saving template to Turso:', err);
+    return false;
+  }
+}
+
+/**
+ * Direct CRUD: Deletes a shift template directly from Turso.
+ */
+export async function deleteTemplateFromTurso(
+  client: Client,
+  clienteCorreo: string,
+  templateId: string
+): Promise<boolean> {
+  try {
+    const email = clienteCorreo.trim().toLowerCase();
+    const tplId = templateId.startsWith(`${email}__`) ? templateId : `${email}__${templateId}`;
+    await client.execute({
+      sql: `DELETE FROM plantillas_turnos WHERE cliente_correo = ? AND id = ?`,
+      args: [email, tplId],
+    });
+    return true;
+  } catch (err) {
+    console.error('Error deleting template from Turso:', err);
+    return false;
+  }
+}
+
+/**
+ * Checks if a newer version of the APK is available in Turso.
+ */
+export async function checkAppUpdateFromTurso(
+  client: Client,
+  currentVersion: string
+): Promise<{ hasUpdate: boolean; latest: AppUpdateInfo | null }> {
+  try {
+    await initializeTursoTables(client);
+
+    const res = await client.execute({
+      sql: 'SELECT id, version, version_code, download_url, notas, actualizado_en FROM app_versiones WHERE id = ?',
+      args: ['latest'],
+    });
+
+    if (res.rows.length === 0) {
+      // Seed default entry
+      const defaultRecord: AppUpdateInfo = {
+        id: 'latest',
+        version: currentVersion,
+        versionCode: 1,
+        downloadUrl: 'https://github.com/repoRoger/CalendarioMedico/releases/download/app-latest/CalendarioMedico.apk',
+        notes: 'Versión oficial para Android con soporte nativo de Google Sign-In y sincronización directa con Turso.',
+      };
+      await client.execute({
+        sql: `INSERT OR REPLACE INTO app_versiones (id, version, version_code, download_url, notas, actualizado_en)
+              VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+        args: [
+          defaultRecord.id,
+          defaultRecord.version,
+          defaultRecord.versionCode,
+          defaultRecord.downloadUrl,
+          defaultRecord.notes,
+        ],
+      });
+      return { hasUpdate: false, latest: defaultRecord };
+    }
+
+    const row = res.rows[0];
+    const latest: AppUpdateInfo = {
+      id: String(row.id),
+      version: String(row.version),
+      versionCode: Number(row.version_code || 1),
+      downloadUrl: String(row.download_url),
+      notes: String(row.notas || ''),
+      updatedAt: String(row.actualizado_en || ''),
+    };
+
+    const hasUpdate = latest.version.trim() !== currentVersion.trim();
+    return { hasUpdate, latest };
+  } catch (err) {
+    console.warn('Error checking app update from Turso:', err);
+    return { hasUpdate: false, latest: null };
+  }
+}
+
+/**
+ * Allows updating the latest version record in Turso.
+ */
+export async function saveAppVersionToTurso(
+  client: Client,
+  version: string,
+  downloadUrl: string,
+  notes: string
+): Promise<boolean> {
+  try {
+    await initializeTursoTables(client);
+    await client.execute({
+      sql: `INSERT OR REPLACE INTO app_versiones (id, version, version_code, download_url, notas, actualizado_en)
+            VALUES ('latest', ?, ?, ?, ?, datetime('now'))`,
+      args: [version.trim(), Date.now(), downloadUrl.trim(), notes.trim()],
+    });
+    return true;
+  } catch (err) {
+    console.error('Error saving app version to Turso:', err);
+    return false;
+  }
+}
+
 
 

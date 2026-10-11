@@ -337,20 +337,20 @@ export function generateSampleShifts(): MedicalShift[] {
   return shifts;
 }
 
-export function getStoredHospitals(): Hospital[] {
+export function clearLegacyLocalStorage(): void {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.HOSPITALS);
-    if (raw === null) {
-      return [];
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed;
-  } catch {
-    return [];
-  }
+    localStorage.removeItem(STORAGE_KEYS.SHIFTS);
+    localStorage.removeItem(STORAGE_KEYS.HOSPITALS);
+    localStorage.removeItem(STORAGE_KEYS.TEMPLATES);
+  } catch {}
+}
+
+// Immediately wipe legacy browser storage on load so data is 100% sourced from Turso
+clearLegacyLocalStorage();
+
+export function getStoredHospitals(): Hospital[] {
+  // Pure in-memory: hospitals are loaded exclusively from Turso on login/mount
+  return [];
 }
 
 /**
@@ -389,84 +389,26 @@ export function getHospitalForShift(shift: MedicalShift, hospitals: Hospital[]):
   return DEFAULT_HOSPITALS[0];
 }
 
-export function saveStoredHospitals(hospitals: Hospital[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.HOSPITALS, JSON.stringify(hospitals));
-  } catch (err) {
-    console.error('Error saving hospitals:', err);
-  }
+export function saveStoredHospitals(_hospitals: Hospital[]): void {
+  // NO-OP: All hospital mutations go directly to Turso database.
 }
 
 export function getStoredShifts(): MedicalShift[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.SHIFTS);
-    if (!raw) {
-      return [];
-    }
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
+  // Pure in-memory: shifts are loaded exclusively from Turso on login/mount
+  return [];
 }
 
-export function saveStoredShifts(shifts: MedicalShift[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(shifts));
-  } catch (err) {
-    console.error('Error saving shifts:', err);
-  }
+export function saveStoredShifts(_shifts: MedicalShift[]): void {
+  // NO-OP: All shift mutations go directly to Turso database.
 }
 
 export function getStoredTemplates(): ShiftTemplate[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(DEFAULT_TEMPLATES));
-      return DEFAULT_TEMPLATES;
-    }
-    const parsed: ShiftTemplate[] = JSON.parse(raw);
-    // Filter out legacy duplicates (M, T, N, D)
-    const cleaned = parsed.filter((t) => !['M', 'T', 'N', 'D'].includes(t.code));
-
-    // Sequence: Básicos (TA, TB, TC, 24H), Choque (CHOQUE), Libres (LIBRE_A, LIBRE_B, LIBRE_C, LIBRE, L), Mixtos (TA-TB, TB-TC, TC-TA)
-    const orderedCodes: ShiftCode[] = [
-      'TA', 'TB', 'TC', '24H',
-      'CHOQUE',
-      'LIBRE_A', 'LIBRE_B', 'LIBRE_C', 'LIBRE', 'L',
-      'TA-TB', 'TB-TC', 'TC-TA',
-    ];
-
-    const result: ShiftTemplate[] = [];
-    orderedCodes.forEach((code) => {
-      const defMatch = DEFAULT_TEMPLATES.find((dt) => dt.code === code);
-      const userMatch = cleaned.find((t) => t.code === code);
-      if (defMatch) {
-        result.push(userMatch ? { ...defMatch, ...userMatch } : defMatch);
-      } else if (userMatch) {
-        result.push(userMatch);
-      }
-    });
-
-    // Keep any other custom templates
-    cleaned.forEach((t) => {
-      if (!orderedCodes.includes(t.code) && !result.some((r) => r.id === t.id)) {
-        result.push(t);
-      }
-    });
-
-    localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(result));
-    return result;
-  } catch {
-    return DEFAULT_TEMPLATES;
-  }
+  // Initial in-memory fallback until user templates load from Turso
+  return DEFAULT_TEMPLATES;
 }
 
-export function saveStoredTemplates(templates: ShiftTemplate[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(templates));
-  } catch (err) {
-    console.error('Error saving templates:', err);
-  }
+export function saveStoredTemplates(_templates: ShiftTemplate[]): void {
+  // NO-OP: All template mutations go directly to Turso database.
 }
 
 export function getStoredUser(): UserSession {

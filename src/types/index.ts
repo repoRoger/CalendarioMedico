@@ -97,3 +97,12 @@ export interface TursoConfig {
   r2BucketName?: string;
   connected: boolean;
 }
+
+export interface AppUpdateInfo {
+  id: string;
+  version: string;
+  versionCode: number;
+  downloadUrl: string;
+  notes: string;
+  updatedAt?: string;
+}

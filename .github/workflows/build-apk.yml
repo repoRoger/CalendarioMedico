@@ -63,12 +63,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         continue-on-error: true
         with:
-          tag_name: app-latest
-          name: "Calendario Médico Android (Descarga directa)"
+          tag_name: "v1.0.${{ github.run_number }}"
+          name: "Calendario Médico Android v1.0.${{ github.run_number }}"
+          make_latest: true
           body: |
             ### 📱 Nueva versión de Calendario Médico para Android
             
-            Descarga el archivo **CalendarioMedico.apk** directamente en tu celular Android para probar la aplicación.
+            Descarga el archivo **CalendarioMedico.apk** directamente en tu celular Android para probar o actualizar la aplicación.
           files: apk-output/CalendarioMedico.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -210,7 +210,6 @@ export const WorkplaceModal: React.FC<WorkplaceModalProps> = ({
               <input
                 type="text"
                 required
-                maxLength={6}
                 value={shortName}
                 onChange={(e) => setShortName(e.target.value.toUpperCase())}
                 placeholder="Ej. HE, BEND"

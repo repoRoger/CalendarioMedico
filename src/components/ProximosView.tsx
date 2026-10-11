@@ -10,7 +10,6 @@ import {
   SPANISH_MONTHS, SPANISH_WEEKDAYS_FULL, formatFriendlyDate,
   getShiftDisplayCode, isShiftCollision, isShiftLibre, getContrastTextColor
 } from '../lib/timeUtils';
-import { PWAInstallButton } from './PWAInstallButton';
 
 interface ProximosViewProps {
   shifts: MedicalShift[];
@@ -411,9 +410,6 @@ export const ProximosView: React.FC<ProximosViewProps> = ({
           </div>
         </div>
       )}
-
-      {/* PWA Install Card Banner */}
-      <PWAInstallButton variant="card" />
     </div>
   );
 };

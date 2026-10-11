@@ -40,10 +40,15 @@ import {
   getTursoClient, syncLocalDataToTurso, saveUserProfileToTurso,
   fetchUserProfileFromTurso, fetchShiftsFromTurso, fetchHospitalsFromTurso,
   fetchTemplatesFromTurso, initializeDefaultTemplatesForUser,
-  mergeShifts, mergeHospitals, deleteHospitalFromTurso,
-  loginUserWithPassword, registerUserWithPassword
+  mergeShifts, mergeHospitals,
+  saveShiftToTurso, deleteShiftFromTurso,
+  saveHospitalToTurso, deleteHospitalFromTurso,
+  saveTemplateToTurso, deleteTemplateFromTurso,
+  loginUserWithPassword, registerUserWithPassword,
+  checkAppUpdateFromTurso
 } from './lib/tursoClient';
 import { generateSampleShifts, DEFAULT_HOSPITALS } from './lib/storage';
+import { CURRENT_APP_VERSION } from './lib/appVersion';
 
 export default function App() {
   const [currentDate, setCurrentDate] = useState(() => getHondurasDate());
@@ -96,10 +101,10 @@ export default function App() {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
-  // Sync Cloud bidirectional (merge local and remote without dropping either!)
+  // Load data directly from Turso (authoritative remote source)
   const handleSyncCloud = async (isSilent = false) => {
     if (!user.email || !tursoConfig.databaseUrl || !tursoConfig.authToken) {
-      if (!isSilent) addNotification('warning', 'Sin sesión', 'Inicia sesión con tu correo para sincronizar.');
+      if (!isSilent) addNotification('warning', 'Sin sesión', 'Inicia sesión con tu correo para cargar datos de Turso.');
       return;
     }
 
@@ -107,47 +112,18 @@ export default function App() {
     try {
       const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
 
-      // 1. Fetch remote shifts and hospitals for this user from Turso
-      const remoteShifts = await fetchShiftsFromTurso(client, user.email);
-      const remoteHospitals = await fetchHospitalsFromTurso(client, user.email);
+      // Fetch remote shifts, hospitals, templates and profile directly from Turso
+      const [remoteShifts, remoteHospitals, remoteTemplates, remoteProfile] = await Promise.all([
+        fetchShiftsFromTurso(client, user.email),
+        fetchHospitalsFromTurso(client, user.email),
+        initializeDefaultTemplatesForUser(client, user.email, DEFAULT_TEMPLATES),
+        fetchUserProfileFromTurso(client, user.email),
+      ]);
 
-      let finalShifts = remoteShifts || [];
+      setShifts(remoteShifts || []);
+      setHospitals(remoteHospitals || []);
 
-      // Check if this device has NEW local shifts that aren't in Turso yet (e.g. friend created them offline)
-      if (shifts && shifts.length > 0) {
-        const unsyncedLocal = shifts.filter(
-          (localS) =>
-            !finalShifts.some(
-              (r) => r.id === localS.id || (r.date === localS.date && r.startTime === localS.startTime)
-            )
-        );
-        if (unsyncedLocal.length > 0) {
-          finalShifts = [...finalShifts, ...unsyncedLocal];
-        }
-      }
-
-      setShifts(finalShifts);
-      saveStoredShifts(finalShifts);
-
-      // 2. HOSPITALS: Turso is authoritative if remote has records.
-      // If this device created a new workplace locally not yet in Turso, include it!
-      let finalHospitals = (remoteHospitals && remoteHospitals.length > 0) ? remoteHospitals : hospitals;
-      if (hospitals && hospitals.length > 0 && remoteHospitals && remoteHospitals.length > 0) {
-        const unsyncedHosp = hospitals.filter(
-          (locH) => !remoteHospitals.some((r) => r.id === locH.id || r.name.toLowerCase() === locH.name.toLowerCase())
-        );
-        const customUnsynced = unsyncedHosp.filter((h) => h.isCustom);
-        if (customUnsynced.length > 0) {
-          finalHospitals = [...finalHospitals, ...customUnsynced];
-        }
-      }
-
-      setHospitals(finalHospitals);
-      saveStoredHospitals(finalHospitals);
-
-      // 3. TEMPLATES: Fetch remote templates for this user if available
-      const remoteTemplates = await initializeDefaultTemplatesForUser(client, user.email, DEFAULT_TEMPLATES);
-      let finalTemplates = remoteTemplates;
+      let finalTemplates = remoteTemplates || DEFAULT_TEMPLATES;
       if (remoteTemplates && remoteTemplates.length > 0) {
         const orderedCodes: ShiftCode[] = [
           'TA', 'TB', 'TC', '24H',
@@ -168,21 +144,7 @@ export default function App() {
         finalTemplates = sorted;
       }
       setTemplates(finalTemplates);
-      saveStoredTemplates(finalTemplates);
 
-      // 4. Keep Turso 100% updated with this consolidated authoritative dataset
-      await syncLocalDataToTurso(client, user.email, finalShifts, finalHospitals, finalTemplates);
-
-      if (!isSilent) {
-        addNotification(
-          'success',
-          'Nube Turso sincronizada',
-          `Sincronizados ${finalShifts.length} turnos totales desde Turso.`
-        );
-      }
-
-      // 4. Fetch remote profile
-      const remoteProfile = await fetchUserProfileFromTurso(client, user.email);
       if (remoteProfile) {
         setUser((prev) => {
           const merged = { ...prev, ...remoteProfile, isLoggedIn: true };
@@ -190,8 +152,16 @@ export default function App() {
           return merged;
         });
       }
+
+      if (!isSilent) {
+        addNotification(
+          'success',
+          'Datos cargados de Turso',
+          `Cargados ${(remoteShifts || []).length} turnos desde Turso.`
+        );
+      }
     } catch (err: any) {
-      console.warn('Sync cloud error:', err);
+      console.warn('Error al cargar datos desde Turso:', err);
       if (!isSilent) {
         addNotification('warning', 'Aviso Turso', err.message || 'Error de conexión a Turso');
       }
@@ -228,6 +198,24 @@ export default function App() {
       handleSyncCloud(true);
     }
   }, [user.email, user.isLoggedIn]);
+
+  // Check for app updates silently on launch
+  useEffect(() => {
+    if (tursoConfig.databaseUrl && tursoConfig.authToken) {
+      const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+      checkAppUpdateFromTurso(client, CURRENT_APP_VERSION)
+        .then((res) => {
+          if (res.hasUpdate && res.latest) {
+            addNotification(
+              'info',
+              'Nueva actualización disponible',
+              `Versión ${res.latest.version} lista para descargar en la pestaña de Perfil.`
+            );
+          }
+        })
+        .catch(() => {});
+    }
+  }, [tursoConfig.databaseUrl, tursoConfig.authToken]);
 
   // Month navigation
   const currentYear = currentDate.getFullYear();
@@ -288,22 +276,18 @@ export default function App() {
     handleSaveTemplates(updated);
   };
 
-  const handleDeleteTemplateFromModal = (templateId: string) => {
+  const handleDeleteTemplateFromModal = async (templateId: string) => {
     const target = templates.find((t) => t.id === templateId);
     const updated = templates.filter((t) => t.id !== templateId);
     setTemplates(updated);
-    saveStoredTemplates(updated);
     addNotification('info', 'Turno eliminado', `Se eliminó "${target?.name || 'la plantilla'}"`);
 
     if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
       try {
         const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-        client.execute({
-          sql: `DELETE FROM plantillas_turnos WHERE cliente_correo = ? AND id = ?`,
-          args: [user.email.trim().toLowerCase(), templateId],
-        }).catch(console.warn);
+        await deleteTemplateFromTurso(client, user.email, templateId);
       } catch (err) {
-        console.warn('Background Turso delete template error:', err);
+        console.warn('Error deleting template from Turso:', err);
       }
     }
   };
@@ -374,13 +358,8 @@ export default function App() {
         const finalTemplates = (remoteTemplates && remoteTemplates.length > 0) ? remoteTemplates : DEFAULT_TEMPLATES;
 
         setShifts(finalShifts);
-        saveStoredShifts(finalShifts);
-
         setHospitals(finalHospitals);
-        saveStoredHospitals(finalHospitals);
-
         setTemplates(finalTemplates);
-        saveStoredTemplates(finalTemplates);
 
         addNotification('success', 'Sesión iniciada con Google', `Bienvenido/a, ${activeUser.name}`);
       } catch (err: any) {
@@ -441,13 +420,8 @@ export default function App() {
       const finalTemplates = (remoteTemplates && remoteTemplates.length > 0) ? remoteTemplates : DEFAULT_TEMPLATES;
 
       setShifts(finalShifts);
-      saveStoredShifts(finalShifts);
-
       setHospitals(finalHospitals);
-      saveStoredHospitals(finalHospitals);
-
       setTemplates(finalTemplates);
-      saveStoredTemplates(finalTemplates);
 
       setUser(activeUser);
       saveStoredUser(activeUser);
@@ -475,15 +449,12 @@ export default function App() {
         return { success: false, message: authRes.message || 'Error al crear la cuenta.' };
       }
 
-      // Brand new user starts with 0 shifts and 0 hospitals, and a fresh isolated copy of default templates
+      // Brand new user starts with 0 shifts and 0 hospitals, and a fresh isolated copy of default templates in Turso
       setShifts([]);
-      saveStoredShifts([]);
       setHospitals([]);
-      saveStoredHospitals([]);
 
       const userTemplates = await initializeDefaultTemplatesForUser(client, cleanEmail, DEFAULT_TEMPLATES);
       setTemplates(userTemplates);
-      saveStoredTemplates(userTemplates);
 
       const activeUser: UserSession = {
         id: `usr-${Date.now()}`,
@@ -512,12 +483,17 @@ export default function App() {
   // Optional: load reference hospitals for users with 0 hospitals
   const handleLoadDefaultHospitals = async () => {
     setHospitals(DEFAULT_HOSPITALS);
-    saveStoredHospitals(DEFAULT_HOSPITALS);
     if (user.email && tursoConfig.databaseUrl && tursoConfig.authToken) {
-      const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-      await syncLocalDataToTurso(client, user.email, shifts, DEFAULT_HOSPITALS, templates);
+      try {
+        const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+        for (const h of DEFAULT_HOSPITALS) {
+          await saveHospitalToTurso(client, user.email, h);
+        }
+      } catch (err) {
+        console.warn('Error saving default hospitals to Turso:', err);
+      }
     }
-    addNotification('success', 'Centros sugeridos cargados', 'Se agregaron Bendaña, Catarino y CEMESA a tu cuenta.');
+    addNotification('success', 'Centros sugeridos cargados', 'Se agregaron Bendaña, Catarino y CEMESA a tu cuenta en Turso.');
   };
 
   // Logout handler
@@ -538,11 +514,8 @@ export default function App() {
     setUser(emptyUser);
     saveStoredUser(emptyUser);
     setShifts([]);
-    saveStoredShifts([]);
     setHospitals([]);
-    saveStoredHospitals([]);
     setTemplates(DEFAULT_TEMPLATES);
-    saveStoredTemplates(DEFAULT_TEMPLATES);
     addNotification('info', 'Sesión cerrada', 'Ingresa con tu correo de Google o contraseña para ver tus turnos.');
   };
 
@@ -563,12 +536,12 @@ export default function App() {
     }
   };
 
-  // Handlers for data updates
-  const handleSaveDayShifts = (date: string, updatedDayShifts: MedicalShift[]) => {
+  // Handlers for data updates: DIRECT TURSO ONLY (No localStorage)
+  const handleSaveDayShifts = async (date: string, updatedDayShifts: MedicalShift[]) => {
+    const existingDayShifts = shifts.filter((s) => s.date === date);
     const filtered = shifts.filter((s) => s.date !== date);
     const nextShifts = [...filtered, ...updatedDayShifts];
     setShifts(nextShifts);
-    saveStoredShifts(nextShifts);
 
     const totalHours = updatedDayShifts.reduce((acc, s) => acc + (s.hours || 0), 0);
     if (totalHours >= 24) {
@@ -580,75 +553,69 @@ export default function App() {
     } else if (updatedDayShifts.length > 0) {
       addNotification(
         'success',
-        'Turnos actualizados',
+        'Turnos guardados',
         `${updatedDayShifts.length} turno(s) guardado(s) (${totalHours}h totales).`
       );
     } else {
       addNotification('info', 'Día actualizado', 'Se eliminaron los turnos asignados a esta fecha.');
     }
 
-    // Auto-sync in background to Turso
+    // Direct mutation to Turso database
     if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
       try {
         const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-        syncLocalDataToTurso(client, user.email, nextShifts, hospitals, templates)
-          .then((res) => {
-            if (res.success) {
-              addNotification('success', 'Nube Turso actualizada', `Guardados ${res.syncedShiftsCount} turnos.`);
-            } else {
-              addNotification('warning', 'Aviso Turso', res.message);
-            }
-          })
-          .catch((err) => {
-            console.warn('Background Turso sync skipped:', err);
-          });
+        const removedShifts = existingDayShifts.filter(
+          (oldS) => !updatedDayShifts.some((newS) => newS.id === oldS.id)
+        );
+        for (const rem of removedShifts) {
+          await deleteShiftFromTurso(client, user.email, rem.id);
+        }
+        for (const s of updatedDayShifts) {
+          await saveShiftToTurso(client, user.email, s);
+        }
       } catch (err) {
-        console.warn('Background Turso sync skipped:', err);
+        console.warn('Error saving shifts directly to Turso:', err);
+        addNotification('warning', 'Aviso Turso', 'Error al sincronizar turnos con Turso.');
       }
     }
   };
 
-  const handleSaveHospitals = (updatedHospitals: Hospital[], deletedHospId?: string) => {
+  const handleSaveHospitals = async (updatedHospitals: Hospital[], deletedHospId?: string) => {
     setHospitals(updatedHospitals);
-    saveStoredHospitals(updatedHospitals);
 
-    // Auto-sync in background to Turso
     if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
       try {
         const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
         if (deletedHospId) {
-          deleteHospitalFromTurso(client, user.email, deletedHospId).catch(console.warn);
+          await deleteHospitalFromTurso(client, user.email, deletedHospId);
         }
-        syncLocalDataToTurso(client, user.email, shifts, updatedHospitals, templates)
-          .then((res) => {
-            if (res.success) {
-              addNotification('success', 'Nube Turso actualizada', `Guardados ${res.syncedHospitalsCount} centros.`);
-            }
-          })
-          .catch((err) => {
-            console.warn('Background Turso sync skipped:', err);
-          });
+        for (const h of updatedHospitals) {
+          await saveHospitalToTurso(client, user.email, h);
+        }
+        addNotification('success', 'Centros guardados en Turso', 'Datos actualizados en la base de datos.');
       } catch (err) {
-        console.warn('Background Turso sync skipped:', err);
+        console.warn('Error saving hospitals directly to Turso:', err);
+        addNotification('warning', 'Aviso Turso', 'Error al guardar centros en Turso.');
       }
     }
   };
 
-  const handleManualTursoSync = async () => {
-    await handleSyncCloud(false);
-  };
-
-  const handleSaveTemplates = (updatedTemplates: ShiftTemplate[]) => {
+  const handleSaveTemplates = async (updatedTemplates: ShiftTemplate[], deletedTplId?: string) => {
     setTemplates(updatedTemplates);
-    saveStoredTemplates(updatedTemplates);
 
-    // Auto-sync in background to Turso
     if (tursoConfig.databaseUrl && tursoConfig.authToken && user.email) {
       try {
         const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-        syncLocalDataToTurso(client, user.email, shifts, hospitals, updatedTemplates);
+        if (deletedTplId) {
+          await deleteTemplateFromTurso(client, user.email, deletedTplId);
+        }
+        for (const t of updatedTemplates) {
+          await saveTemplateToTurso(client, user.email, t);
+        }
+        addNotification('success', 'Plantillas guardadas en Turso', 'Horarios actualizados en la base de datos.');
       } catch (err) {
-        console.warn('Background Turso sync skipped:', err);
+        console.warn('Error saving templates directly to Turso:', err);
+        addNotification('warning', 'Aviso Turso', 'Error al guardar plantillas en Turso.');
       }
     }
   };
@@ -663,19 +630,24 @@ export default function App() {
     hospitals?: Hospital[];
     templates?: ShiftTemplate[];
   }) => {
-    if (data.shifts) {
-      setShifts(data.shifts);
-      saveStoredShifts(data.shifts);
+    if (data.shifts) setShifts(data.shifts);
+    if (data.hospitals) setHospitals(data.hospitals);
+    if (data.templates) setTemplates(data.templates);
+    if (user.email && tursoConfig.databaseUrl && tursoConfig.authToken) {
+      try {
+        const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+        syncLocalDataToTurso(
+          client,
+          user.email,
+          data.shifts || shifts,
+          data.hospitals || hospitals,
+          data.templates || templates
+        ).catch(console.warn);
+      } catch (err) {
+        console.warn('Error syncing imported backup to Turso:', err);
+      }
     }
-    if (data.hospitals) {
-      setHospitals(data.hospitals);
-      saveStoredHospitals(data.hospitals);
-    }
-    if (data.templates) {
-      setTemplates(data.templates);
-      saveStoredTemplates(data.templates);
-    }
-    addNotification('success', 'Datos importados', 'Copia de seguridad restaurada correctamente.');
+    addNotification('success', 'Datos importados', 'Copia de seguridad restaurada directamente en Turso.');
   };
 
   const handleQuickAssignShift = (
@@ -774,11 +746,8 @@ export default function App() {
       <Header
         user={user}
         onOpenProfile={() => setIsProfileModalOpen(true)}
-        onSyncCloud={() => handleSyncCloud(false)}
-        isSyncingCloud={isSyncingCloud}
         onOpenStats={() => setIsStatsModalOpen(true)}
         onOpenExport={() => setIsExportModalOpen(true)}
-        onLogout={handleLogout}
       />
 
       {/* Main Workspace */}
@@ -822,12 +791,12 @@ export default function App() {
         {activeSection === 'calendario' && (
           <div className="space-y-3 sm:space-y-4">
             {/* Dedicated Month Selector & View Mode Switcher for Calendar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 p-2 sm:p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-md">
               {/* Month / Year Navigator */}
-              <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-2xl p-1 self-start sm:self-auto shadow-inner">
+              <div className="flex items-center justify-between sm:justify-start gap-1 bg-slate-950 border border-slate-800 rounded-xl p-1 w-full sm:w-auto shadow-inner">
                 <button
                   onClick={handlePrevDate}
-                  className="p-2 hover:bg-slate-800 text-slate-400 hover:text-slate-100 rounded-xl transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center active:scale-95"
+                  className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-100 rounded-lg transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center active:scale-95"
                   title={currentView === 'week' ? 'Semana anterior' : 'Mes anterior'}
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -835,7 +804,7 @@ export default function App() {
 
                 <button
                   onClick={handleToday}
-                  className="px-3 py-1.5 text-sm font-extrabold text-slate-100 hover:text-teal-300 transition-colors capitalize text-center min-w-[130px] sm:min-w-[160px] tracking-tight"
+                  className="px-2 py-1 text-xs sm:text-sm font-extrabold text-slate-100 hover:text-teal-300 transition-colors capitalize text-center flex-1 sm:flex-none sm:min-w-[140px] tracking-tight"
                   title="Ir al mes o semana actual (Hoy)"
                 >
                   {currentView === 'week'
@@ -845,7 +814,7 @@ export default function App() {
 
                 <button
                   onClick={handleNextDate}
-                  className="p-2 hover:bg-slate-800 text-slate-400 hover:text-slate-100 rounded-xl transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center active:scale-95"
+                  className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-100 rounded-lg transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center active:scale-95"
                   title={currentView === 'week' ? 'Semana siguiente' : 'Mes siguiente'}
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -853,17 +822,17 @@ export default function App() {
 
                 <button
                   onClick={handleToday}
-                  className="px-2.5 py-1 text-xs font-bold text-teal-400 hover:text-teal-300 bg-teal-950/60 border border-teal-800/40 rounded-xl hover:bg-teal-900/60 transition-colors ml-1"
+                  className="px-2 py-1 text-xs font-bold text-teal-400 hover:text-teal-300 bg-teal-950/60 border border-teal-800/40 rounded-lg hover:bg-teal-900/60 transition-colors ml-1"
                 >
                   Hoy
                 </button>
               </div>
 
-              {/* View mode switcher: Mes / Semana / Lista */}
-              <div className="flex items-center bg-slate-950 border border-slate-800 rounded-2xl p-1 self-start sm:self-auto">
+              {/* View mode switcher: Mes / Semana / Lista (100% simétrico con grid-cols-3) */}
+              <div className="grid grid-cols-3 bg-slate-950 border border-slate-800 rounded-xl p-1 w-full sm:w-64">
                 <button
                   onClick={() => setCurrentView('month')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`py-1.5 text-center rounded-lg text-xs font-bold transition-all ${
                     currentView === 'month'
                       ? 'bg-teal-600 text-white shadow-md'
                       : 'text-slate-400 hover:text-slate-200'
@@ -873,7 +842,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setCurrentView('week')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`py-1.5 text-center rounded-lg text-xs font-bold transition-all ${
                     currentView === 'week'
                       ? 'bg-teal-600 text-white shadow-md'
                       : 'text-slate-400 hover:text-slate-200'
@@ -883,7 +852,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setCurrentView('list')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`py-1.5 text-center rounded-lg text-xs font-bold transition-all ${
                     currentView === 'list'
                       ? 'bg-teal-600 text-white shadow-md'
                       : 'text-slate-400 hover:text-slate-200'
@@ -893,8 +862,9 @@ export default function App() {
                 </button>
               </div>
             </div>
+
             {/* Hospital Filter WrapPanel */}
-            <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
+            <div className="p-2.5 sm:p-3 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-slate-300 flex items-center gap-1.5">
                   <Filter className="w-3.5 h-3.5 text-teal-400" />
@@ -933,19 +903,16 @@ export default function App() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* "Todos" pill */}
+                  {/* "Todos" pill (sin contador de turnos para mayor limpieza) */}
                   <button
                     onClick={() => setHospitalFilter('all')}
-                    className={`min-h-[38px] px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 ${
+                    className={`min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center transition-all active:scale-95 ${
                       hospitalFilter === 'all'
                         ? 'bg-teal-500 text-slate-950 font-bold shadow-md shadow-teal-500/20 ring-2 ring-teal-400'
                         : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700'
                     }`}
                   >
                     <span>Todos</span>
-                    <span className="bg-black/20 px-1.5 py-0.2 rounded text-[10.5px] font-mono">
-                      {currentMonthShifts.length}
-                    </span>
                   </button>
 
                   {/* Each hospital badge */}
@@ -960,7 +927,7 @@ export default function App() {
                       <button
                         key={hosp.id}
                         onClick={() => setHospitalFilter(isSelected ? 'all' : hosp.id)}
-                        className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold text-white flex items-center gap-2 transition-all active:scale-95 shadow-sm border ${
+                        className={`min-h-[36px] px-3 py-1.5 rounded-xl text-xs font-semibold text-white flex items-center gap-2 transition-all active:scale-95 shadow-sm border ${
                           isSelected
                             ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105 border-white font-bold'
                             : 'border-transparent opacity-85 hover:opacity-100 hover:scale-[1.02]'
@@ -978,18 +945,6 @@ export default function App() {
                       </button>
                     );
                   })}
-
-                  {/* Quick link to create workplace */}
-                  <button
-                    onClick={() => {
-                      setEditingHospital(null);
-                      setIsWorkplaceModalOpen(true);
-                    }}
-                    className="text-xs text-slate-400 hover:text-teal-300 px-2.5 py-1.5 rounded-xl border border-dashed border-slate-700 hover:border-teal-500/50 min-h-[40px] flex items-center gap-1 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Nuevo Centro</span>
-                  </button>
                 </div>
               )}
             </div>
@@ -1038,8 +993,8 @@ export default function App() {
             user={user}
             hospitals={hospitals}
             shifts={shifts}
+            tursoConfig={tursoConfig}
             onOpenEditModal={() => setIsProfileModalOpen(true)}
-            onManualSync={handleManualTursoSync}
             onLoadSampleShifts={handleLoadSampleShifts}
             onLogout={handleLogout}
           />

@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import {
   User, Edit2, Mail, Phone, Award, ShieldCheck, Database,
-  Building2, Calendar, Clock, LogOut, CheckCircle2, MapPin, RefreshCw, Plus
+  Building2, Calendar, Clock, LogOut, CheckCircle2, MapPin, RefreshCw, Plus,
+  Download, Sparkles, AlertCircle
 } from 'lucide-react';
-import { UserSession, Hospital, MedicalShift } from '../types';
+import { UserSession, Hospital, MedicalShift, TursoConfig, AppUpdateInfo } from '../types';
+import { CURRENT_APP_VERSION } from '../lib/appVersion';
+import { getTursoClient, checkAppUpdateFromTurso } from '../lib/tursoClient';
 
 interface ProfileReportViewProps {
   user: UserSession;
   hospitals: Hospital[];
   shifts: MedicalShift[];
+  tursoConfig?: TursoConfig;
   onOpenEditModal: () => void;
-  onManualSync?: () => Promise<void> | void;
   onLoadSampleShifts?: () => void;
   onLogout: () => void;
 }
@@ -19,24 +22,39 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
   user,
   hospitals,
   shifts,
+  tursoConfig,
   onOpenEditModal,
-  onManualSync,
   onLoadSampleShifts,
   onLogout,
 }) => {
-  const [isSyncing, setIsSyncing] = useState(false);
-
   const activeShifts = shifts.filter((s) => s.shiftCode !== 'L');
   const totalHours = activeShifts.reduce((acc, s) => acc + (s.hours || 0), 0);
   const total24H = activeShifts.filter((s) => s.shiftCode === '24H' || (s.hours || 0) >= 24).length;
 
-  const handleSyncClick = async () => {
-    if (!onManualSync) return;
-    setIsSyncing(true);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [updateChecked, setUpdateChecked] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+
+  const handleCheckUpdate = async () => {
+    if (!tursoConfig?.databaseUrl || !tursoConfig?.authToken) {
+      setUpdateError('Configuración de base de datos no disponible.');
+      return;
+    }
+    setIsCheckingUpdate(true);
+    setUpdateError(null);
     try {
-      await onManualSync();
+      const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+      const res = await checkAppUpdateFromTurso(client, CURRENT_APP_VERSION);
+      setUpdateInfo(res.latest);
+      setUpdateAvailable(res.hasUpdate);
+      setUpdateChecked(true);
+    } catch (err: any) {
+      setUpdateError(err?.message || 'Error al conectar para verificar actualizaciones.');
+      setUpdateChecked(true);
     } finally {
-      setIsSyncing(false);
+      setIsCheckingUpdate(false);
     }
   };
 
@@ -198,23 +216,99 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
               </button>
             )}
 
-            {onManualSync && (
-              <button
-                onClick={handleSyncClick}
-                disabled={isSyncing}
-                className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-teal-900/40 transition-all active:scale-95 min-h-[38px]"
-                title="Forzar sincronización de turnos con Turso"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Ahora'}</span>
-              </button>
-            )}
-
             <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-950/50 px-3 py-1.5 rounded-xl border border-emerald-800/40 min-h-[38px]">
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Conectado</span>
             </div>
           </div>
+        </div>
+
+        {/* Actualizaciones de la Aplicación */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0">
+                <Download className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-bold text-slate-200">
+                    Actualizaciones de la App
+                  </p>
+                  <span className="px-2 py-0.5 rounded-full bg-slate-800 text-teal-300 border border-slate-700 text-[10px] font-mono font-bold">
+                    v{CURRENT_APP_VERSION}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Comprueba si existe una versión más reciente disponible para tu dispositivo Android.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleCheckUpdate}
+              disabled={isCheckingUpdate}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-all active:scale-95 disabled:opacity-50 min-h-[38px] self-start sm:self-auto"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-teal-400 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+              <span>{isCheckingUpdate ? 'Comprobando...' : 'Buscar Actualización'}</span>
+            </button>
+          </div>
+
+          {/* Update Available Box */}
+          {updateAvailable && updateInfo && (
+            <div className="p-4 rounded-xl bg-gradient-to-r from-teal-950/60 to-emerald-950/40 border border-teal-600/40 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-md bg-teal-500/20 text-teal-300 border border-teal-500/40 text-[11px] font-bold flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-teal-300" />
+                      ¡Nueva versión disponible!
+                    </span>
+                    <span className="text-xs font-mono font-bold text-white">
+                      v{updateInfo.version}
+                    </span>
+                  </div>
+                  {updateInfo.notes && (
+                    <p className="text-xs text-slate-300 pt-1 leading-relaxed">
+                      {updateInfo.notes}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-teal-800/30">
+                <p className="text-[10px] text-slate-400">
+                  Descarga el archivo APK y pulsa la notificación para instalar sobre la app existente.
+                </p>
+                <a
+                  href={updateInfo.downloadUrl}
+                  target="_system"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-teal-950/50 transition-all active:scale-95 text-center min-h-[40px]"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Descargar e Instalar APK</span>
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Up to date notice */}
+          {updateChecked && !updateAvailable && !updateError && (
+            <div className="flex items-center gap-2 text-xs font-medium text-emerald-400 bg-emerald-950/30 px-3 py-2 rounded-xl border border-emerald-800/30">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>Tu aplicación ya tiene la versión más reciente (v{CURRENT_APP_VERSION}).</span>
+            </div>
+          )}
+
+          {/* Error notice */}
+          {updateError && (
+            <div className="flex items-center gap-2 text-xs font-medium text-rose-400 bg-rose-950/30 px-3 py-2 rounded-xl border border-rose-800/30">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{updateError}</span>
+            </div>
+          )}
         </div>
 
         {/* Logout button */}
