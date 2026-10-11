@@ -210,18 +210,30 @@ export default function App() {
   // Check for app updates silently on launch
   useEffect(() => {
     if (tursoConfig.databaseUrl && tursoConfig.authToken) {
-      const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-      checkAppUpdateFromTurso(client, CURRENT_APP_VERSION)
-        .then((res) => {
-          if (res.hasUpdate && res.latest) {
-            addNotification(
-              'info',
-              'Nueva actualización disponible',
-              `Versión ${res.latest.version} lista para descargar en la pestaña de Perfil.`
-            );
-          }
-        })
-        .catch(() => {});
+      const checkUpdate = async () => {
+        let v = CURRENT_APP_VERSION;
+        if (Capacitor.isNativePlatform()) {
+          try {
+            const currentRes = await CapacitorUpdater.current();
+            if (currentRes?.bundle?.version) {
+              v = currentRes.bundle.version;
+            }
+          } catch {}
+        }
+        const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
+        checkAppUpdateFromTurso(client, v)
+          .then((res) => {
+            if (res.hasUpdate && res.latest) {
+              addNotification(
+                'info',
+                'Nueva actualización disponible',
+                `Versión ${res.latest.version} lista para actualizar en la pestaña de Perfil.`
+              );
+            }
+          })
+          .catch(() => {});
+      };
+      checkUpdate();
     }
   }, [tursoConfig.databaseUrl, tursoConfig.authToken]);
 

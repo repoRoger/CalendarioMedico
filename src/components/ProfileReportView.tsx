@@ -40,8 +40,21 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
   const [updateError, setUpdateError] = useState<string | null>(null);
 
   // OTA Live Update state
+  const [activeVersion, setActiveVersion] = useState<string>(CURRENT_APP_VERSION);
   const [isApplyingOta, setIsApplyingOta] = useState(false);
   const [otaStatus, setOtaStatus] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      CapacitorUpdater.current()
+        .then((res) => {
+          if (res?.bundle?.version) {
+            setActiveVersion(res.bundle.version);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   const handleCheckUpdate = async () => {
     if (!tursoConfig?.databaseUrl || !tursoConfig?.authToken) {
@@ -51,8 +64,18 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
     setIsCheckingUpdate(true);
     setUpdateError(null);
     try {
+      let currentV = activeVersion;
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const resCurrent = await CapacitorUpdater.current();
+          if (resCurrent?.bundle?.version) {
+            currentV = resCurrent.bundle.version;
+            setActiveVersion(resCurrent.bundle.version);
+          }
+        } catch {}
+      }
       const client = getTursoClient(tursoConfig.databaseUrl, tursoConfig.authToken);
-      const res = await checkAppUpdateFromTurso(client, CURRENT_APP_VERSION);
+      const res = await checkAppUpdateFromTurso(client, currentV);
       setUpdateInfo(res.latest);
       setUpdateAvailable(res.hasUpdate);
       setUpdateChecked(true);
@@ -97,7 +120,9 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
         });
         setOtaStatus('¡Instalación completada! Reiniciando app...');
         await CapacitorUpdater.set(bundle);
-        // CapacitorUpdater.set automatically triggers an immediate WebView reload!
+        setTimeout(() => {
+          window.location.reload();
+        }, 800);
       } else {
         setOtaStatus('Actualizando aplicación web...');
         window.location.reload();
@@ -289,7 +314,7 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
                     Actualizaciones de la App
                   </p>
                   <span className="px-2 py-0.5 rounded-full bg-slate-800 text-teal-300 border border-slate-700 text-[10px] font-mono font-bold">
-                    v{CURRENT_APP_VERSION}
+                    v{activeVersion}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400">
@@ -375,7 +400,7 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
           {updateChecked && !updateAvailable && !updateError && (
             <div className="flex items-center gap-2 text-xs font-medium text-emerald-400 bg-emerald-950/30 px-3 py-2 rounded-xl border border-emerald-800/30">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Tu aplicación ya tiene la versión más reciente (v{CURRENT_APP_VERSION}).</span>
+              <span>Tu aplicación ya tiene la versión más reciente (v{activeVersion}).</span>
             </div>
           )}
 
