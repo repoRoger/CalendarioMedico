@@ -67,13 +67,33 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
   const handleApplyOta = async () => {
     if (!updateInfo) return;
     setIsApplyingOta(true);
-    setOtaStatus('Descargando actualización en segundo plano (2-3s)...');
+    setOtaStatus('Preparando verificación de actualización...');
     try {
       if (Capacitor.isNativePlatform()) {
         const zipUrl = updateInfo.downloadUrl.replace(/CalendarioMedico\.apk$/i, 'dist.zip');
+        let checksum = updateInfo.checksum?.trim() || '';
+
+        if (!checksum) {
+          try {
+            const shaRes = await fetch(`${zipUrl}.sha256`);
+            if (shaRes.ok) {
+              const text = await shaRes.text();
+              checksum = text.trim().split(/\s+/)[0];
+            }
+          } catch (e) {
+            console.warn('No se pudo obtener .sha256 remoto:', e);
+          }
+        }
+
+        if (!checksum) {
+          throw new Error('Checksum SHA-256 no disponible para esta versión.');
+        }
+
+        setOtaStatus('Descargando actualización en segundo plano (2-3s)...');
         const bundle = await CapacitorUpdater.download({
           url: zipUrl,
           version: updateInfo.version,
+          checksum: checksum,
         });
         setOtaStatus('¡Instalación completada! Reiniciando app...');
         await CapacitorUpdater.set(bundle);

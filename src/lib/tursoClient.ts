@@ -157,10 +157,15 @@ export async function initializeTursoTables(client: Client): Promise<void> {
       version TEXT NOT NULL,
       version_code INTEGER NOT NULL,
       download_url TEXT NOT NULL,
+      checksum TEXT,
       notas TEXT,
       actualizado_en TEXT
     )
   `);
+
+  try {
+    await client.execute(`ALTER TABLE app_versiones ADD COLUMN checksum TEXT`);
+  } catch {}
 }
 
 /**
@@ -1019,7 +1024,7 @@ export async function checkAppUpdateFromTurso(
     await initializeTursoTables(client);
 
     const res = await client.execute({
-      sql: 'SELECT id, version, version_code, download_url, notas, actualizado_en FROM app_versiones WHERE id = ?',
+      sql: 'SELECT id, version, version_code, download_url, checksum, notas, actualizado_en FROM app_versiones WHERE id = ?',
       args: ['latest'],
     });
 
@@ -1030,16 +1035,18 @@ export async function checkAppUpdateFromTurso(
         version: currentVersion,
         versionCode: 1,
         downloadUrl: 'https://github.com/repoRoger/CalendarioMedico/releases/download/app-latest/CalendarioMedico.apk',
+        checksum: undefined,
         notes: 'Versión oficial para Android con soporte nativo de Google Sign-In y sincronización directa con Turso.',
       };
       await client.execute({
-        sql: `INSERT OR REPLACE INTO app_versiones (id, version, version_code, download_url, notas, actualizado_en)
-              VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+        sql: `INSERT OR REPLACE INTO app_versiones (id, version, version_code, download_url, checksum, notas, actualizado_en)
+              VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
         args: [
           defaultRecord.id,
           defaultRecord.version,
           defaultRecord.versionCode,
           defaultRecord.downloadUrl,
+          defaultRecord.checksum || null,
           defaultRecord.notes,
         ],
       });
@@ -1052,6 +1059,7 @@ export async function checkAppUpdateFromTurso(
       version: String(row.version),
       versionCode: Number(row.version_code || 1),
       downloadUrl: String(row.download_url),
+      checksum: row.checksum ? String(row.checksum) : undefined,
       notes: String(row.notas || ''),
       updatedAt: String(row.actualizado_en || ''),
     };
@@ -1071,14 +1079,15 @@ export async function saveAppVersionToTurso(
   client: Client,
   version: string,
   downloadUrl: string,
-  notes: string
+  notes: string,
+  checksum?: string
 ): Promise<boolean> {
   try {
     await initializeTursoTables(client);
     await client.execute({
-      sql: `INSERT OR REPLACE INTO app_versiones (id, version, version_code, download_url, notas, actualizado_en)
-            VALUES ('latest', ?, ?, ?, ?, datetime('now'))`,
-      args: [version.trim(), Date.now(), downloadUrl.trim(), notes.trim()],
+      sql: `INSERT OR REPLACE INTO app_versiones (id, version, version_code, download_url, checksum, notas, actualizado_en)
+            VALUES ('latest', ?, ?, ?, ?, ?, datetime('now'))`,
+      args: [version.trim(), Date.now(), downloadUrl.trim(), checksum?.trim() || null, notes.trim()],
     });
     return true;
   } catch (err) {

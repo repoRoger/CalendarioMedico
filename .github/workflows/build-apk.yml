@@ -54,6 +54,10 @@ jobs:
           cd dist
           zip -r ../apk-output/dist.zip .
           cd ..
+          sha256sum apk-output/dist.zip | awk '{print $1}' > apk-output/dist.zip.sha256
+          echo "SHA-256 checksum:"
+          cat apk-output/dist.zip.sha256
+          node scripts/update_version.mjs "1.0.${{ github.run_number }}" "Actualización OTA v1.0.${{ github.run_number }} con soporte SHA-256."
 
       - name: Subir APK como artefacto de Actions
         uses: actions/upload-artifact@v4
@@ -76,5 +80,6 @@ jobs:
           files: |
             apk-output/CalendarioMedico.apk
             apk-output/dist.zip
+            apk-output/dist.zip.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

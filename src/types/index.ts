@@ -103,6 +103,7 @@ export interface AppUpdateInfo {
   version: string;
   versionCode: number;
   downloadUrl: string;
+  checksum?: string;
   notes: string;
   updatedAt?: string;
 }
