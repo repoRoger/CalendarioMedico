@@ -51,12 +51,14 @@ import { generateSampleShifts, DEFAULT_HOSPITALS } from './lib/storage';
 import { CURRENT_APP_VERSION } from './lib/appVersion';
 import { Capacitor } from '@capacitor/core';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
+import { initNotificationChannel, syncScheduledShiftNotifications } from './lib/notifications';
 
 export default function App() {
-  // Notify CapacitorUpdater that app loaded successfully
+  // Notify CapacitorUpdater that app loaded successfully and setup notifications
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       CapacitorUpdater.notifyAppReady().catch(() => {});
+      initNotificationChannel().catch(() => {});
     }
   }, []);
   const [currentDate, setCurrentDate] = useState(() => getHondurasDate());
@@ -72,6 +74,13 @@ export default function App() {
 
   // Hospital filter for calendar (WrapPanel)
   const [hospitalFilter, setHospitalFilter] = useState<string>('all');
+
+  // Sincronizar recordatorios de turnos en Android automáticamente
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      syncScheduledShiftNotifications(shifts, hospitals, templates);
+    }
+  }, [shifts, hospitals, templates]);
 
   // Modal States (User prefers modals/popups for adding and editing data)
   const [selectedDateForModal, setSelectedDateForModal] = useState<string | null>(null);
@@ -1062,6 +1071,10 @@ export default function App() {
             onOpenEdit={(tpl) => {
               setEditingTemplate(tpl);
               setIsTemplateModalOpen(true);
+            }}
+            onNotify={addNotification}
+            onSettingsChanged={() => {
+              syncScheduledShiftNotifications(shifts, hospitals, templates);
             }}
           />
         )}
