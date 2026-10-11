@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Clock, Moon, Sparkles, Building2, Paintbrush, AlertTriangle, Check, RefreshCw, X, ShieldAlert } from 'lucide-react';
+import { Plus, Clock, Moon, Sparkles, Building2, Paintbrush, AlertTriangle, Check, RefreshCw, X, ShieldAlert, Trash2 } from 'lucide-react';
 import {
   CalendarDayItem, SPANISH_WEEKDAYS, getShiftDisplayCode, getShiftMobileLabel,
   isShiftLibre, isShiftCollision, formatFriendlyDate, doShiftsOverlap, getContrastTextColor,
@@ -22,6 +22,7 @@ interface CalendarMonthViewProps {
     resolution: 'create' | 'replace' | 'keep_both' | 'mark_collision',
     department?: string
   ) => void;
+  onSaveDayShifts?: (date: string, shifts: MedicalShift[]) => void;
 }
 
 interface CollisionDialogState {
@@ -43,13 +44,23 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
   filteredHospitalId = 'all',
   onSelectDate,
   onQuickAssignShift,
+  onSaveDayShifts,
 }) => {
-  // Quick Painter Mode states
-  const [isQuickMode, setIsQuickMode] = useState(false);
+  // Calendar Interaction Tool Mode: 'normal' | 'quick_paint' | 'quick_libre' | 'quick_delete'
+  type InteractionMode = 'normal' | 'quick_paint' | 'quick_libre' | 'quick_delete';
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>('normal');
+  const isQuickMode = interactionMode === 'quick_paint';
+
   const [selectedHospitalId, setSelectedHospitalId] = useState<string>(() => hospitals[0]?.id || 'hosp-bendana');
   const [selectedTemplateCode, setSelectedTemplateCode] = useState<ShiftCode>('TA');
   const [quickDepartment, setQuickDepartment] = useState('');
   const [collisionDialog, setCollisionDialog] = useState<CollisionDialogState | null>(null);
+
+  // Dynamic Delete Modal state
+  const [deleteTargetDay, setDeleteTargetDay] = useState<{
+    date: string;
+    shifts: MedicalShift[];
+  } | null>(null);
 
   // Apply hospital filter if selected
   const activeShifts = filteredHospitalId === 'all'
@@ -71,17 +82,69 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
   const activeTpl = templates.find((t) => t.code === selectedTemplateCode);
 
   const handleDayClick = (dayItem: CalendarDayItem) => {
-    if (!isQuickMode) {
-      onSelectDate(dayItem.date);
-      return;
-    }
-
-    if (!onQuickAssignShift) {
+    // 1. Normal mode: abre modal de edición de día completo
+    if (interactionMode === 'normal') {
       onSelectDate(dayItem.date);
       return;
     }
 
     const allDayShifts = shifts.filter((s) => s.date === dayItem.date);
+
+    // 2. Modo Libre (🌴)
+    if (interactionMode === 'quick_libre') {
+      if (!onSaveDayShifts) return;
+      const isAlreadyLibre = allDayShifts.length > 0 && allDayShifts.every(
+        (s) => s.shiftCode === 'L' || s.title.toLowerCase().includes('descanso') || s.title.toLowerCase().includes('libre total')
+      );
+
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try { navigator.vibrate(25); } catch {}
+      }
+
+      if (isAlreadyLibre) {
+        // Desmarcar día libre (lo deja vacío)
+        onSaveDayShifts(dayItem.date, []);
+      } else {
+        // Asignar día libre total (palmerita de descanso)
+        const libreShift: MedicalShift = {
+          id: `shift-libre-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          date: dayItem.date,
+          hospitalId: '',
+          shiftCode: 'L',
+          title: 'Día Libre Descanso',
+          startTime: '00:00',
+          endTime: '23:59',
+          hours: 0,
+          color: '#10b981',
+          isNightShift: false,
+        };
+        onSaveDayShifts(dayItem.date, [libreShift]);
+      }
+      return;
+    }
+
+    // 3. Modo Eliminar (🗑️)
+    if (interactionMode === 'quick_delete') {
+      if (allDayShifts.length === 0) {
+        return;
+      }
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try { navigator.vibrate(30); } catch {}
+      }
+      // Abrir popup dinámico de eliminación según los turnos de ese día
+      setDeleteTargetDay({
+        date: dayItem.date,
+        shifts: allDayShifts,
+      });
+      return;
+    }
+
+    // 4. Modo Rápido (quick_paint)
+    if (!onQuickAssignShift) {
+      onSelectDate(dayItem.date);
+      return;
+    }
+
     const targetHosp = hospitals.find((h) => h.id === selectedHospitalId) || hospitals[0];
     const targetTpl = templates.find((t) => t.code === selectedTemplateCode);
 
@@ -90,8 +153,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
     const newHours = targetTpl?.defaultHours || 8;
     const normalizedTargetCode = getShiftDisplayCode(selectedTemplateCode, templates);
 
-    // 1. Check if exact same shift already exists on this day in same hospital
-    // If it exists, this is a TOGGLE OFF (remove) action. We must NOT trigger collision with other shifts!
+    // Check if exact same shift already exists on this day in same hospital
     const exactMatch = allDayShifts.find((s) => {
       const sHosp = getHospitalForShift(s, hospitals);
       const sCode = getShiftDisplayCode(s.shiftCode, templates);
@@ -107,8 +169,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
       return;
     }
 
-    // 2. Intelligent Conflict / Overlap Detection
-    // Check if there is an overlapping shift on this date using real time intervals
+    // Intelligent Conflict / Overlap Detection
     const newTimeSpan = {
       startTime: newStartTime,
       endTime: newEndTime,
@@ -127,7 +188,6 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
     });
 
     if (conflictShift) {
-      // THERE IS AN ACTUAL TIME OVERLAP/COLLISION! Show conflict resolution modal
       const existingHosp = getHospitalForShift(conflictShift, hospitals);
       setCollisionDialog({
         date: dayItem.date,
@@ -142,8 +202,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
       return;
     }
 
-    // 3. NO CONFLICT! Different non-overlapping hours (e.g. TA in Hosp 1 + TB in Hosp 2)
-    // Add directly with gentle vibration feedback
+    // NO CONFLICT
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
         navigator.vibrate(30);
@@ -164,19 +223,53 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsQuickMode(!isQuickMode)}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer min-h-[40px] ${
-            isQuickMode
-              ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-amber-500/25 ring-2 ring-amber-300'
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-          }`}
-          title="Modo rápido: selecciona lugar y turno, luego toca los días para asignarlo al instante"
-        >
-          <Paintbrush className="w-3.5 h-3.5" />
-          <span>{isQuickMode ? 'Modo Rápido: ACTIVO' : '🖌️ Modo Asignación Rápida'}</span>
-        </button>
+        {/* 3 Modos: A. Modo Rápido, B. Libre, C. Eliminar */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* A. Modo Rápido */}
+          <button
+            type="button"
+            onClick={() => setInteractionMode(interactionMode === 'quick_paint' ? 'normal' : 'quick_paint')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer min-h-[38px] ${
+              interactionMode === 'quick_paint'
+                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-amber-500/25 ring-2 ring-amber-300'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+            }`}
+            title="Asignar rápidamente un centro y turno al tocar los días"
+          >
+            <Paintbrush className="w-3.5 h-3.5" />
+            <span>{interactionMode === 'quick_paint' ? 'Modo Rápido: ON' : 'Modo Rápido'}</span>
+          </button>
+
+          {/* B. Libre */}
+          <button
+            type="button"
+            onClick={() => setInteractionMode(interactionMode === 'quick_libre' ? 'normal' : 'quick_libre')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer min-h-[38px] ${
+              interactionMode === 'quick_libre'
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-emerald-500/25 ring-2 ring-emerald-300'
+                : 'bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700'
+            }`}
+            title="Marcar día como Libre Descanso total (palmerita) al tocarlo"
+          >
+            <span>🌴</span>
+            <span>{interactionMode === 'quick_libre' ? 'Libre: ON' : 'Libre'}</span>
+          </button>
+
+          {/* C. Ícono de Eliminar */}
+          <button
+            type="button"
+            onClick={() => setInteractionMode(interactionMode === 'quick_delete' ? 'normal' : 'quick_delete')}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer min-h-[38px] ${
+              interactionMode === 'quick_delete'
+                ? 'bg-rose-600 hover:bg-rose-500 text-white font-black shadow-rose-500/25 ring-2 ring-rose-300'
+                : 'bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700'
+            }`}
+            title="Tocar un día para elegir qué turnos eliminar"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden xs:inline">{interactionMode === 'quick_delete' ? 'Borrar: ON' : 'Eliminar'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Quick Painter Toolbar (Visible when isQuickMode is active) */}
@@ -319,12 +412,63 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
 
             <button
               type="button"
-              onClick={() => setIsQuickMode(false)}
+              onClick={() => setInteractionMode('normal')}
               className="self-end sm:self-auto text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 cursor-pointer min-h-[36px] flex items-center gap-1"
             >
               <span>✕ Salir de Modo Rápido</span>
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Banner de Modo Libre (🌴) */}
+      {interactionMode === 'quick_libre' && (
+        <div className="p-3 bg-emerald-950/85 border-b border-emerald-600/50 flex items-center justify-between gap-3 text-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5 text-emerald-200 min-w-0">
+            <span className="text-xl shrink-0">🌴</span>
+            <div className="min-w-0">
+              <p className="font-black text-emerald-100 flex items-center gap-1.5">
+                <span>Modo Día Libre (Descanso) Activo</span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded border border-emerald-500/30">1 toque</span>
+              </p>
+              <p className="text-[11px] text-emerald-300/80 truncate">
+                Toca cualquier día para marcarlo como descanso total con palmerita o para desmarcarlo.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setInteractionMode('normal')}
+            className="px-3 py-1.5 rounded-xl bg-emerald-900/70 hover:bg-emerald-800 text-white text-xs font-bold border border-emerald-700/70 shrink-0 cursor-pointer min-h-[34px]"
+          >
+            ✕ Salir
+          </button>
+        </div>
+      )}
+
+      {/* Banner de Modo Eliminar (🗑️) */}
+      {interactionMode === 'quick_delete' && (
+        <div className="p-3 bg-rose-950/85 border-b border-rose-600/50 flex items-center justify-between gap-3 text-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5 text-rose-200 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-rose-500/20 flex items-center justify-center text-rose-300 shrink-0 border border-rose-500/30">
+              <Trash2 className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-black text-rose-100">
+                Modo Eliminación Rápida Activo
+              </p>
+              <p className="text-[11px] text-rose-300/80 truncate">
+                Toca cualquier día con turnos asignados para elegir qué turnos deseas borrar.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setInteractionMode('normal')}
+            className="px-3 py-1.5 rounded-xl bg-rose-900/70 hover:bg-rose-800 text-white text-xs font-bold border border-rose-700/70 shrink-0 cursor-pointer min-h-[34px]"
+          >
+            ✕ Salir
+          </button>
         </div>
       )}
 
@@ -436,7 +580,15 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
 
                   {/* Hover icon */}
                   <span className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-teal-300 p-0.5 rounded">
-                    {isQuickMode ? <Paintbrush className="w-3.5 h-3.5 text-amber-400" /> : <Plus className="w-3.5 h-3.5" />}
+                    {interactionMode === 'quick_paint' ? (
+                      <Paintbrush className="w-3.5 h-3.5 text-amber-400" />
+                    ) : interactionMode === 'quick_libre' ? (
+                      <span className="text-xs">🌴</span>
+                    ) : interactionMode === 'quick_delete' ? (
+                      <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    ) : (
+                      <Plus className="w-3.5 h-3.5" />
+                    )}
                   </span>
                 </div>
               </div>
@@ -624,6 +776,95 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                 Cancelar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic Delete Modal for quick_delete mode */}
+      {deleteTargetDay && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-white flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-300 flex items-center justify-center border border-rose-500/30">
+                    <Trash2 className="w-4 h-4" />
+                  </div>
+                  <span>Eliminar turnos del día</span>
+                </h3>
+                <p className="text-xs text-slate-400 capitalize mt-1">
+                  {formatFriendlyDate(deleteTargetDay.date)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteTargetDay(null)}
+                className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              ¿Qué deseas eliminar de este día?
+            </p>
+
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+              {/* Opción 1: Eliminar TODO el día */}
+              <button
+                type="button"
+                onClick={() => {
+                  onSaveDayShifts?.(deleteTargetDay.date, []);
+                  setDeleteTargetDay(null);
+                }}
+                className="w-full p-3 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-rose-950/40 active:scale-95 transition-all cursor-pointer min-h-[44px]"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Eliminar TODO ({deleteTargetDay.shifts.length} {deleteTargetDay.shifts.length === 1 ? 'turno' : 'turnos'})</span>
+              </button>
+
+              {/* Opción 2: Eliminar turnos específicos dinámicamente si hay más de 1 */}
+              {deleteTargetDay.shifts.length > 1 && (
+                <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                    O borrar turno individual:
+                  </p>
+                  {deleteTargetDay.shifts.map((s) => {
+                    const hosp = hospitals.find((h) => h.id === s.hospitalId);
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          const remaining = deleteTargetDay.shifts.filter((x) => x.id !== s.id);
+                          onSaveDayShifts?.(deleteTargetDay.date, remaining);
+                          setDeleteTargetDay(null);
+                        }}
+                        className="w-full p-2.5 bg-slate-950 hover:bg-slate-800 text-slate-200 hover:text-white rounded-xl text-xs font-medium flex items-center justify-between gap-2 border border-slate-800 hover:border-rose-500/50 active:scale-95 transition-all cursor-pointer min-h-[42px] text-left"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-rose-300 block truncate">
+                            Borrar solo: {s.title || s.shiftCode}
+                          </span>
+                          <span className="text-[11px] text-slate-400 block truncate">
+                            {s.startTime} - {s.endTime} {hosp ? `· ${hosp.shortName}` : ''}
+                          </span>
+                        </div>
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setDeleteTargetDay(null)}
+              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold cursor-pointer min-h-[38px]"
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       )}

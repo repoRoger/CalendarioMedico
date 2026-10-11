@@ -31,7 +31,12 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-6 py-2.5">
+    <header
+      className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-6 pb-2.5 sm:py-2.5"
+      style={{
+        paddingTop: 'max(env(safe-area-inset-top, 0px), 2rem)',
+      }}
+    >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2.5 sm:gap-4">
         {/* Left: User Avatar, Name & Cargo */}
         <button

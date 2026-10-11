@@ -7,6 +7,8 @@ import {
 import { UserSession, Hospital, MedicalShift, TursoConfig, AppUpdateInfo } from '../types';
 import { CURRENT_APP_VERSION } from '../lib/appVersion';
 import { getTursoClient, checkAppUpdateFromTurso } from '../lib/tursoClient';
+import { Capacitor } from '@capacitor/core';
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
 
 interface ProfileReportViewProps {
   user: UserSession;
@@ -37,6 +39,10 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
+  // OTA Live Update state
+  const [isApplyingOta, setIsApplyingOta] = useState(false);
+  const [otaStatus, setOtaStatus] = useState<string | null>(null);
+
   const handleCheckUpdate = async () => {
     if (!tursoConfig?.databaseUrl || !tursoConfig?.authToken) {
       setUpdateError('Configuración de base de datos no disponible.');
@@ -55,6 +61,31 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
       setUpdateChecked(true);
     } finally {
       setIsCheckingUpdate(false);
+    }
+  };
+
+  const handleApplyOta = async () => {
+    if (!updateInfo) return;
+    setIsApplyingOta(true);
+    setOtaStatus('Descargando actualización en segundo plano (2-3s)...');
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const zipUrl = updateInfo.downloadUrl.replace(/CalendarioMedico\.apk$/i, 'dist.zip');
+        const bundle = await CapacitorUpdater.download({
+          url: zipUrl,
+          version: updateInfo.version,
+        });
+        setOtaStatus('¡Instalación completada! Reiniciando app...');
+        await CapacitorUpdater.set(bundle);
+        // CapacitorUpdater.set automatically triggers an immediate WebView reload!
+      } else {
+        setOtaStatus('Actualizando aplicación web...');
+        window.location.reload();
+      }
+    } catch (err: any) {
+      console.error('Error aplicando actualización OTA:', err);
+      setOtaStatus(`Error en actualización rápida: ${err?.message || 'Fallo de descarga'}. Puedes usar la opción de Descargar APK.`);
+      setIsApplyingOta(false);
     }
   };
 
@@ -279,19 +310,43 @@ export const ProfileReportView: React.FC<ProfileReportViewProps> = ({
                 </div>
               </div>
 
+              {/* Status message during OTA */}
+              {otaStatus && (
+                <div className="p-2.5 rounded-lg bg-teal-950/60 border border-teal-500/40 text-xs text-teal-200 flex items-center gap-2">
+                  <RefreshCw className={`w-3.5 h-3.5 text-teal-400 ${isApplyingOta ? 'animate-spin' : ''}`} />
+                  <span>{otaStatus}</span>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-teal-800/30">
-                <p className="text-[10px] text-slate-400">
-                  Descarga el archivo APK y pulsa la notificación para instalar sobre la app existente.
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Actualiza en 2 segundos sin salir de la app ni descargar APK manual.
                 </p>
-                <a
-                  href={updateInfo.downloadUrl}
-                  target="_system"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-teal-950/50 transition-all active:scale-95 text-center min-h-[40px]"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Descargar e Instalar APK</span>
-                </a>
+
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  {/* Botón Principal: Actualización en vivo OTA */}
+                  <button
+                    type="button"
+                    onClick={handleApplyOta}
+                    disabled={isApplyingOta}
+                    className="flex-1 sm:flex-initial px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-teal-950/50 active:scale-95 transition-all cursor-pointer min-h-[42px] disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isApplyingOta ? 'animate-spin' : ''}`} />
+                    <span>{isApplyingOta ? 'Instalando...' : '⚡ Actualizar al Instante'}</span>
+                  </button>
+
+                  {/* Botón Secundario: Descargar APK manual */}
+                  <a
+                    href={updateInfo.downloadUrl}
+                    target="_system"
+                    rel="noopener noreferrer"
+                    className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700 min-h-[42px] transition-colors"
+                    title="Descargar archivo APK si prefieres instalarlo manualmente"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Descargar APK</span>
+                  </a>
+                </div>
               </div>
             </div>
           )}

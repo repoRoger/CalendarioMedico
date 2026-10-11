@@ -21,10 +21,10 @@ async function main() {
     sql: `INSERT OR REPLACE INTO app_versiones (id, version, version_code, download_url, notas, actualizado_en)
           VALUES ('latest', ?, ?, ?, ?, datetime('now'))`,
     args: [
-      '1.0.2',
-      2,
+      '1.0.3',
+      4,
       'https://github.com/repoRoger/CalendarioMedico/releases/latest/download/CalendarioMedico.apk',
-      'Ajustes de diseño: nombre compacto en cabecera sin desborde, alerta de choque reducida a icono de warning en calendario, y optimización de vista de perfil.',
+      'Novedades v1.0.3: Espacio superior para barra de estado/WhatsApp, modos Modo Rápido, Libre (palmerita) y Eliminar dinámico en calendario, y actualización rápida en vivo sin salir de la app.',
     ],
   });
 

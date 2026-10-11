@@ -49,8 +49,16 @@ import {
 } from './lib/tursoClient';
 import { generateSampleShifts, DEFAULT_HOSPITALS } from './lib/storage';
 import { CURRENT_APP_VERSION } from './lib/appVersion';
+import { Capacitor } from '@capacitor/core';
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
 
 export default function App() {
+  // Notify CapacitorUpdater that app loaded successfully
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      CapacitorUpdater.notifyAppReady().catch(() => {});
+    }
+  }, []);
   const [currentDate, setCurrentDate] = useState(() => getHondurasDate());
   const [currentView, setCurrentView] = useState<'month' | 'week' | 'list'>('month');
   const [activeSection, setActiveSection] = useState<MainAppSection>('proximos');
@@ -959,6 +967,7 @@ export default function App() {
                 filteredHospitalId={hospitalFilter}
                 onSelectDate={(date) => setSelectedDateForModal(date)}
                 onQuickAssignShift={handleQuickAssignShift}
+                onSaveDayShifts={handleSaveDayShifts}
               />
             )}
 
