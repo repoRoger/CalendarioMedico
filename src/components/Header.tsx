@@ -16,6 +16,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenProfile,
   onOpenStats,
   onOpenExport,
+  onRefresh,
+  isRefreshing,
 }) => {
   // Obtener solo primeros dos nombres o nombre y apellido (sin cargo ni prefijo)
   const getCleanShortName = () => {
